@@ -36,9 +36,7 @@ function Benchmark:teardown() end
 function Benchmark:timeit(...)
    self:setup()
    local stats = luamark.timeit(function()
-      for _ = 1, self.n_entities do
-         self:run()
-      end
+      self:run()
    end, ...)
    self:teardown()
    return stats

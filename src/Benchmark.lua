@@ -42,4 +42,17 @@ function Benchmark:timeit(...)
    return stats
 end
 
+--- Runs the benchmark a specified number of times and measures the memory usage.
+--- This method sets up the benchmark, runs it for the specified number of entities, and then tears it down.
+--- @vararg any: Optional arguments that can be passed to the 'luamark.memit' method.
+--- @return table: Returns a table containing statistics about the benchmark run (such as time taken).
+function Benchmark:memit(...)
+   self:setup()
+   local stats = luamark.memit(function()
+      self:run()
+   end, ...)
+   self:teardown()
+   return stats
+end
+
 return Benchmark

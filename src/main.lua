@@ -42,7 +42,7 @@ local function main(frameworks, tests)
 
             local benchmark = framework[test_name](n_entities)
             local time_stats = benchmark:timeit()
-            print(time_stats)
+            local mem_stats = benchmark:memit()
          end
       end
    end

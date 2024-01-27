@@ -7,6 +7,9 @@
   "workspace.checkThirdParty": false,
   "diagnostics": {
     "globals": [],
-    "disable": ["lowercase-global", "undefined-global", "codestyle-check"]
+    "disable": ["lowercase-global", "undefined-global", "codestyle-check",
+            "duplicate-set-field",
+            "doc-field-no-class",
+            "inject-field"]
   }
 }

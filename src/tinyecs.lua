@@ -1,3 +1,4 @@
+---@diagnostic disable: unused-local
 local Benchmark = require("src.Benchmark")
 local class = require("pl.class")
 local tiny = require("tiny")

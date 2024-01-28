@@ -4,7 +4,7 @@ local printf = require("pl.utils").printf
 local data = require("pl.data")
 local path = require("pl.path")
 
-local FRAMEWORKS = { tinyecs = require("src.tinyecs") }
+local FRAMEWORKS = { tinyecs = require("src.tinyecs"), ["ecs-lua"] = require("src.ecs-lua") }
 local FRAMEWORK_NAMES = tablex.keys(FRAMEWORKS)
 
 local TESTS = {
@@ -19,7 +19,7 @@ local TESTS = {
    "system_update",
 }
 
-local N_ENTITIES = { 100, 1000, 10000, 100000, 1000000 }
+local N_ENTITIES = { 100 }
 
 local HEADERS = {
    "n_entities",
@@ -54,6 +54,7 @@ local function to_array2d(stats, extra)
       stats[key] = value
    end
 
+   local value
    for i = 1, #HEADERS do
       value = stats[HEADERS[i]]
       if value ~= nil then

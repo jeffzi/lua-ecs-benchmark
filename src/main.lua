@@ -14,7 +14,7 @@ local TESTS = {
    "get_components",
    "remove_component",
    "remove_components",
-   "query",
+   "system_update",
 }
 
 local N_ENTITIES = { 100, 1000, 10000, 100000, 1000000 }

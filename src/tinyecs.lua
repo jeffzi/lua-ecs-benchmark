@@ -102,8 +102,8 @@ function remove_components:run()
    end
 end
 
-local query = class(TinyBenchmark)
-function query:setup()
+local system_update = class(TinyBenchmark)
+function system_update:setup()
    self.world = tiny.world()
    local padding, shuffle
    for i = 1, self.n_entities do
@@ -140,10 +140,18 @@ function query:setup()
 
    local MovementSystem = tiny.processingSystem()
    MovementSystem.filter = tiny.requireAll("Position", "Velocity")
-   function MovementSystem:process(e, dt) end
+
+   function MovementSystem:process(e, dt)
+      local position = e.Position
+      local velocity = e.Velocity
+      position.x = position.x + velocity.x * dt
+      position.y = position.y + velocity.y * dt
+   end
+
+   tiny.addSystem(self.world, MovementSystem)
 end
 
-function query:run()
+function system_update:run()
    tiny.update(self.world, 1 / 60)
 end
 
@@ -154,5 +162,5 @@ return {
    get_components = get_components,
    remove_component = remove_component,
    remove_components = remove_components,
-   query = query,
+   system_update = system_update,
 }

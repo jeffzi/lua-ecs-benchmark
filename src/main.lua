@@ -8,10 +8,12 @@ local FRAMEWORKS = { tinyecs = require("src.tinyecs") }
 local FRAMEWORK_NAMES = tablex.keys(FRAMEWORKS)
 
 local TESTS = {
-   "create_empty",
+   "create_empty_entity",
    "create_entities",
+   "get_component",
    "get_components",
    "remove_component",
+   "remove_components",
    "query",
 }
 

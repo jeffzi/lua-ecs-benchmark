@@ -1,0 +1,3 @@
+[submodule "lib/ecs-lua"]
+	path = lib/ecs-lua
+	url = https://github.com/nidorx/ecs-lua

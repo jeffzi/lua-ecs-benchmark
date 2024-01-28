@@ -13,8 +13,8 @@ function TinyBenchmark:teardown()
    self.world = nil
 end
 
-local create_empty = class(TinyBenchmark)
-function create_empty:run()
+local create_empty_entity = class(TinyBenchmark)
+function create_empty_entity:run()
    for _ = 1, self.n_entities do
       tiny.addEntity(self.world, {})
    end
@@ -37,8 +37,9 @@ function create_entities:run()
    end
 end
 
-local get_components = class(TinyBenchmark)
-function get_components:setup()
+local EntityFactory = class(TinyBenchmark)
+
+function EntityFactory:setup()
    self.world = tiny.world()
    self.entities = {}
    for _ = 1, self.n_entities do
@@ -57,6 +58,19 @@ function get_components:setup()
    end
 end
 
+local get_component = class(EntityFactory)
+
+function get_component:run()
+   --luacheck: ignore
+   local component
+   for i = 1, #self.entities do
+      local entity = self.entities[i]
+      component = entity.Position
+   end
+end
+
+local get_components = class(EntityFactory)
+
 function get_components:run()
    --luacheck: ignore
    local component
@@ -68,26 +82,23 @@ function get_components:run()
    end
 end
 
-local remove_component = class(TinyBenchmark)
-function remove_component:setup()
-   self.world = tiny.world()
-   self.entities = {}
-   for _ = 1, self.n_entities do
-      local entity = tiny.addEntity(self.world, {
-         Position = {
-            x = 0.0,
-            y = 0.0,
-         },
-      })
-      table.insert(self.entities, entity)
-   end
-   self.i = 1
-end
+local remove_component = class(EntityFactory)
 
 function remove_component:run()
    for i = 1, #self.entities do
       local entity = self.entities[i]
       entity.Position = nil
+   end
+end
+
+local remove_components = class(EntityFactory)
+
+function remove_components:run()
+   for i = 1, #self.entities do
+      local entity = self.entities[i]
+      entity.Position = nil
+      entity.Velocity = nil
+      entity.Optional = nil
    end
 end
 
@@ -105,7 +116,7 @@ function query:setup()
             x = 0.0,
             y = 0.0,
          },
-         Health = { health = 0 },
+         Health = { health = 100.0 },
       })
 
       padding = i % 4
@@ -137,9 +148,11 @@ function query:run()
 end
 
 return {
-   create_empty = create_empty,
+   create_empty_entity = create_empty_entity,
    create_entities = create_entities,
+   get_component = get_component,
    get_components = get_components,
    remove_component = remove_component,
+   remove_components = remove_components,
    query = query,
 }

@@ -74,7 +74,7 @@ local function main(output, frameworks, tests)
    local stats = {}
    local total = tablex.size(frameworks) * tablex.size(tests) * tablex.size(N_ENTITIES)
    local i = 0
-   local benchmark, row, extra, framework, suffix
+   local framework, benchmark_cls, benchmark, row, extra
    for _, n_entities in pairs(N_ENTITIES) do
       extra = { n_entities = n_entities }
 
@@ -83,26 +83,31 @@ local function main(output, frameworks, tests)
 
          for _, framework_name in pairs(frameworks) do
             i = i + 1
+            framework = FRAMEWORKS[framework_name]
+            benchmark_cls = framework[test_name]
+
             printf(
                "[%d/%d][%d entities][%s]: %s\n",
                i,
                total,
                n_entities,
                test_name,
-               framework_name
+               benchmark_cls and framework_name
+                  or (framework_name .. "." .. test_name .. " not found, skipping")
             )
-            extra["framework"] = framework_name
-            framework = FRAMEWORKS[framework_name]
 
-            benchmark = framework[test_name](n_entities)
-            row = benchmark:timeit()
-            extra["unit"] = "s"
-            table.insert(stats, to_array2d(row, extra))
+            if benchmark_cls then
+               extra["framework"] = framework_name
+               benchmark = benchmark_cls(n_entities)
 
-            benchmark = framework[test_name](n_entities)
-            row = benchmark:memit()
-            extra["unit"] = "kb"
-            table.insert(stats, to_array2d(row, extra))
+               row = benchmark:timeit()
+               extra["unit"] = "s"
+               table.insert(stats, to_array2d(row, extra))
+
+               row = benchmark:memit()
+               extra["unit"] = "kb"
+               table.insert(stats, to_array2d(row, extra))
+            end
          end
       end
    end

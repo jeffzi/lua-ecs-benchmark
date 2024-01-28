@@ -12,6 +12,8 @@ local TESTS = {
    "create_entities",
    "get_component",
    "get_components",
+   "set_component",
+   "set_components",
    "remove_component",
    "remove_components",
    "system_update",

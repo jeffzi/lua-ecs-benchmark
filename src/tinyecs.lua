@@ -82,6 +82,37 @@ function get_components:run()
    end
 end
 
+local set_component = class(EntityFactory)
+
+function set_component:run()
+   --luacheck: ignore
+   for i = 1, #self.entities do
+      self.entities[i].Position = {
+         x = 0.0,
+         y = 0.0,
+      }
+   end
+end
+
+local set_components = class(EntityFactory)
+
+function set_components:run()
+   --luacheck: ignore
+   local entity
+   for i = 1, #self.entities do
+      entity = self.entities[i]
+      entity.Position = {
+         x = 0.0,
+         y = 0.0,
+      }
+      entity.Velocity = {
+         x = 0.0,
+         y = 0.0,
+      }
+      entity.Optional = {}
+   end
+end
+
 local remove_component = class(EntityFactory)
 
 function remove_component:run()

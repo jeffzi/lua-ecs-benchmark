@@ -105,9 +105,9 @@ end
 local system_update = class(TinyBenchmark)
 function system_update:setup()
    self.world = tiny.world()
-   local padding, shuffle
+   local entity, padding, shuffle
    for i = 1, self.n_entities do
-      local entity = tiny.addEntity(self.world, {
+      entity = tiny.addEntity(self.world, {
          Position = {
             x = 0.0,
             y = 0.0,
@@ -116,7 +116,6 @@ function system_update:setup()
             x = 0.0,
             y = 0.0,
          },
-         Health = { health = 100.0 },
       })
 
       padding = i % 4
@@ -133,8 +132,6 @@ function system_update:setup()
          entity.Position = nil
       elseif shuffle == 1 then
          entity.Velocity = nil
-      elseif shuffle == 2 then
-         entity.Health = nil
       end
    end
 

@@ -42,8 +42,9 @@ local EntityFactory = class(TinyBenchmark)
 function EntityFactory:setup()
    self.world = tiny.world()
    self.entities = {}
+   local entity
    for _ = 1, self.n_entities do
-      local entity = tiny.addEntity(self.world, {
+      entity = tiny.addEntity(self.world, {
          Position = {
             x = 0.0,
             y = 0.0,
@@ -52,7 +53,7 @@ function EntityFactory:setup()
             x = 0.0,
             y = 0.0,
          },
-         Optional = nil,
+         Optional = {},
       })
       table.insert(self.entities, entity)
    end
@@ -64,18 +65,16 @@ function get_component:run()
    --luacheck: ignore
    local component
    for i = 1, #self.entities do
-      local entity = self.entities[i]
-      component = entity.Position
+      component = self.entities[i].Position
    end
 end
 
 local get_components = class(EntityFactory)
-
 function get_components:run()
    --luacheck: ignore
-   local component
+   local component, entity
    for i = 1, #self.entities do
-      local entity = self.entities[i]
+      entity = self.entities[i]
       component = entity.Position
       component = entity.Velocity
       component = entity.Optional
@@ -117,8 +116,7 @@ local remove_component = class(EntityFactory)
 
 function remove_component:run()
    for i = 1, #self.entities do
-      local entity = self.entities[i]
-      entity.Position = nil
+      self.entities[i].Position = nil
    end
 end
 
@@ -188,6 +186,8 @@ return {
    create_entities = create_entities,
    get_component = get_component,
    get_components = get_components,
+   set_component = set_component,
+   set_components = set_components,
    remove_component = remove_component,
    remove_components = remove_components,
    system_update = system_update,

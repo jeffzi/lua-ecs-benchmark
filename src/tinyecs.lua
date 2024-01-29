@@ -82,9 +82,9 @@ function get_components:run()
    end
 end
 
-local set_component = class(EntityFactory)
+local add_component = class(EntityFactory)
 
-function set_component:run()
+function add_component:run()
    --luacheck: ignore
    for i = 1, #self.entities do
       self.entities[i].Position = {
@@ -94,9 +94,9 @@ function set_component:run()
    end
 end
 
-local set_components = class(EntityFactory)
+local add_components = class(EntityFactory)
 
-function set_components:run()
+function add_components:run()
    --luacheck: ignore
    local entity
    for i = 1, #self.entities do
@@ -187,8 +187,8 @@ return {
    create_entities = create_entities,
    get_component = get_component,
    get_components = get_components,
-   set_component = set_component,
-   set_components = set_components,
+   add_component = add_component,
+   add_components = add_components,
    remove_component = remove_component,
    remove_components = remove_components,
    system_update = system_update,

@@ -4,7 +4,11 @@ local printf = require("pl.utils").printf
 local data = require("pl.data")
 local path = require("pl.path")
 
-local FRAMEWORKS = { tinyecs = require("src.tinyecs"), ["ecs-lua"] = require("src.ecs-lua") }
+local FRAMEWORKS = {
+   tinyecs = require("src.tinyecs"),
+   ["ecs-lua"] = require("src.ecs-lua"),
+   concord = require("src.concord"),
+}
 local FRAMEWORK_NAMES = tablex.keys(FRAMEWORKS)
 
 local TESTS = {

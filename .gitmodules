@@ -1,3 +1,6 @@
 [submodule "lib/ecs-lua"]
 	path = lib/ecs-lua
 	url = https://github.com/nidorx/ecs-lua
+[submodule "lib/Concord"]
+	path = lib/Concord
+	url = https://github.com/Keyslam-Group/Concord

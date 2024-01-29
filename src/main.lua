@@ -23,7 +23,7 @@ local TESTS = {
    "system_update",
 }
 
-local N_ENTITIES = { 100 }
+local N_ENTITIES = { 10, 100, 1000, 10000, 100000, 1000000 }
 
 local HEADERS = {
    "n_entities",

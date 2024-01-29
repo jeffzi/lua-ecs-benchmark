@@ -50,13 +50,15 @@ end
 
 local EntityFactory = class(ConcordBenchmark)
 
-function EntityFactory:setup()
+function EntityFactory:setup(empty)
    self.world = World()
    self.entities = {}
    local entity
    for _ = 1, self.n_entities do
       entity = Entity(self.world)
-      entity:give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0):give("Optional")
+      if not empty then
+         entity:give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0):give("Optional")
+      end
       table.insert(self.entities, entity)
    end
 end
@@ -85,13 +87,17 @@ end
 
 local add_component = class(EntityFactory)
 
+function add_component:setup()
+   EntityFactory.setup(self, true)
+end
+
 function add_component:run()
    for i = 1, #self.entities do
       self.entities[i]:give("Position", 0.0, 0.0)
    end
 end
 
-local add_components = class(EntityFactory)
+local add_components = class(add_component)
 
 function add_components:run()
    for i = 1, #self.entities do

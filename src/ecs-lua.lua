@@ -58,21 +58,25 @@ end
 
 local EntityFactory = class(ECSBenchmark)
 
-function EntityFactory:setup()
+function EntityFactory:setup(empty)
    self.world = ECS.World()
    self.entities = {}
    local entity
    for _ = 1, self.n_entities do
-      entity = self.world:Entity(
-         Position({
-            x = 0.0,
-            y = 0.0,
-         }),
-         Velocity({
-            x = 0.0,
-            y = 0.0,
-         }, Optional())
-      )
+      if empty then
+         entity = self.world:Entity()
+      else
+         entity = self.world:Entity(
+            Position({
+               x = 0.0,
+               y = 0.0,
+            }),
+            Velocity({
+               x = 0.0,
+               y = 0.0,
+            }, Optional())
+         )
+      end
       table.insert(self.entities, entity)
    end
 end
@@ -100,6 +104,10 @@ end
 
 local add_component = class(EntityFactory)
 
+function add_component:setup()
+   EntityFactory.setup(self, true)
+end
+
 function add_component:run()
    --luacheck: ignore
    for i = 1, #self.entities do
@@ -110,7 +118,7 @@ function add_component:run()
    end
 end
 
-local add_components = class(EntityFactory)
+local add_components = class(add_component)
 
 function add_components:run()
    --luacheck: ignore

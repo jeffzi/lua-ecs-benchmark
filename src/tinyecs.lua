@@ -40,22 +40,27 @@ end
 
 local EntityFactory = class(TinyBenchmark)
 
-function EntityFactory:setup()
+function EntityFactory:setup(empty)
    self.world = tiny.world()
    self.entities = {}
    local entity
    for _ = 1, self.n_entities do
-      entity = tiny.addEntity(self.world, {
-         Position = {
-            x = 0.0,
-            y = 0.0,
-         },
-         Velocity = {
-            x = 0.0,
-            y = 0.0,
-         },
-         Optional = {},
-      })
+      if empty then
+         entity = tiny.addEntity(self.world, {})
+      else
+         entity = tiny.addEntity(self.world, {
+            Position = {
+               x = 0.0,
+               y = 0.0,
+            },
+            Velocity = {
+               x = 0.0,
+               y = 0.0,
+            },
+            Optional = {},
+         })
+      end
+
       table.insert(self.entities, entity)
    end
 end
@@ -84,6 +89,10 @@ end
 
 local add_component = class(EntityFactory)
 
+function add_component:setup()
+   EntityFactory.setup(self, true)
+end
+
 function add_component:run()
    --luacheck: ignore
    for i = 1, #self.entities do
@@ -94,7 +103,7 @@ function add_component:run()
    end
 end
 
-local add_components = class(EntityFactory)
+local add_components = class(add_component)
 
 function add_components:run()
    --luacheck: ignore
@@ -133,6 +142,7 @@ function remove_components:run()
 end
 
 local system_update = class(TinyBenchmark)
+
 function system_update:setup()
    self.world = tiny.world()
    local entity, padding, shuffle

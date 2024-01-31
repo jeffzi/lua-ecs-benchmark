@@ -8,6 +8,7 @@ local FRAMEWORKS = {
    ["ecs-lua"] = require("src.ecs-lua"),
    concord = require("src.concord"),
    echoes = require("src.echoes"),
+   lovetoys = require("src.lovetoys"),
    nata = require("src.nata"),
    tinyecs = require("src.tinyecs"),
 }

@@ -5,9 +5,10 @@ local data = require("pl.data")
 local path = require("pl.path")
 
 local FRAMEWORKS = {
-   tinyecs = require("src.tinyecs"),
    ["ecs-lua"] = require("src.ecs-lua"),
    concord = require("src.concord"),
+   nata = require("src.nata"),
+   tinyecs = require("src.tinyecs"),
 }
 local FRAMEWORK_NAMES = tablex.keys(FRAMEWORKS)
 

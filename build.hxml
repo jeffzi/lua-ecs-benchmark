@@ -1,0 +1,7 @@
+-cp src/haxe/
+-lib echoes hmecs
+-lua src/haxe/transpiled.lua
+
+-D analyzer-optimize
+
+--macro include('', true, null, ['src/haxe'])

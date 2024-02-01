@@ -1,5 +1,6 @@
 std = "min"
 include_files = { "src" }
+exclude_files = { "src/haxe" }
 globals = {
    "now",
 }

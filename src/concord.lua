@@ -38,6 +38,7 @@ function create_empty_entity:run()
    for _ = 1, self.n_entities do
       self.world:addEntity(Entity())
    end
+   self.world:__flush()
 end
 
 local create_entities = class.create_entities(ConcordBenchmark)
@@ -46,6 +47,7 @@ function create_entities:run()
    for _ = 1, self.n_entities do
       self.world:addEntity(Entity():give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0))
    end
+   self.world:__flush()
 end
 
 local EntityFactory = class(ConcordBenchmark)
@@ -111,6 +113,7 @@ function remove_component:run()
    for i = 1, #self.entities do
       self.entities[i]:remove("Position")
    end
+   self.world:__flush()
 end
 
 local remove_components = class(EntityFactory)
@@ -119,6 +122,7 @@ function remove_components:run()
    for i = 1, #self.entities do
       self.entities[i]:remove("Position"):remove("Velocity"):remove("Optional")
    end
+   self.world:__flush()
 end
 
 local system_update = class(ConcordBenchmark)

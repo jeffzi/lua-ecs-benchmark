@@ -25,6 +25,8 @@ local ECSBenchmark = class(Benchmark)
 function ECSBenchmark:setup()
    self.world = ECS.World()
    self.world:SetFrequency(60)
+   self.timestep = 1
+   self.dt = 1000 / 60 / 1000
 end
 
 function ECSBenchmark:teardown()
@@ -37,6 +39,8 @@ function create_empty_entity:run()
    for _ = 1, self.n_entities do
       self.world:Entity()
    end
+   self.timestep = self.timestep + 1
+   self.world:Update("process", self.timestep * self.dt)
 end
 
 local create_entities = class.create_entities(ECSBenchmark)
@@ -54,6 +58,8 @@ function create_entities:run()
          })
       )
    end
+   self.timestep = self.timestep + 1
+   self.world:Update("process", self.timestep * self.dt)
 end
 
 local EntityFactory = class(ECSBenchmark)
@@ -199,8 +205,6 @@ function system_update:setup()
    end)
 
    self.world:AddSystem(MovementSystem)
-   self.timestep = 1
-   self.dt = 1000 / 60 / 1000
 end
 
 function system_update:run()

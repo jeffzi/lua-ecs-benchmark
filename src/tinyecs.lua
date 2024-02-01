@@ -19,6 +19,7 @@ function create_empty_entity:run()
    for _ = 1, self.n_entities do
       tiny.addEntity(self.world, {})
    end
+   tiny.refresh(self.world)
 end
 
 local create_entities = class.create_entities(TinyBenchmark)
@@ -36,6 +37,7 @@ function create_entities:run()
          },
       })
    end
+   tiny.refresh(self.world)
 end
 
 local EntityFactory = class(TinyBenchmark)

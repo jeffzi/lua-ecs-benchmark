@@ -5,22 +5,22 @@ local data = require("pl.data")
 local path = require("pl.path")
 
 local FRAMEWORKS = {
-   ["ecs-lua"] = require("src.ecs-lua"),
-   concord = require("src.concord"),
-   echoes = require("src.echoes"),
-   lovetoys = require("src.lovetoys"),
-   nata = require("src.nata"),
-   tinyecs = require("src.tinyecs"),
+   ["ecs-lua"] = require("src.frameworks.ecs-lua"),
+   concord = require("src.frameworks.concord"),
+   echoes = require("src.frameworks.echoes"),
+   lovetoys = require("src.frameworks.lovetoys"),
+   nata = require("src.frameworks.nata"),
+   tinyecs = require("src.frameworks.tinyecs"),
 }
 local FRAMEWORK_NAMES = tablex.keys(FRAMEWORKS)
 
 local TESTS = {
+   "add_component",
+   "add_components",
    "create_empty_entity",
    "create_entities",
    "get_component",
    "get_components",
-   "add_component",
-   "add_components",
    "remove_component",
    "remove_components",
    "system_update",

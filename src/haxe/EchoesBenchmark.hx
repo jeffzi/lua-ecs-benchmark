@@ -81,6 +81,14 @@ class EntityFactory extends HaxeBenchmark {
 	}
 }
 
+class RemoveEntities extends EntityFactory {
+	public function run():Void {
+		for (entity in this.entities) {
+			entity.destroy();
+		}
+	}
+}
+
 class GetComponent extends EntityFactory {
 	public function run():Void {
 		for (entity in this.entities) {

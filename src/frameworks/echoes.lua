@@ -23,6 +23,7 @@ fix_haxe_lua(haxe_path, {
    "HaxeBenchmark",
    "CreateEmptyEntity",
    "CreateEntities",
+   "RemoveEntities",
    "GetComponent",
    "GetComponents",
    "AddComponent",
@@ -52,6 +53,12 @@ local create_entities = class.create_entities(EchoesBenchmark)
 
 function create_entities:setup()
    self.benchmark = CreateEntities.new(self.n_entities)
+end
+
+local remove_entities = class(EchoesBenchmark)
+
+function remove_entities:setup()
+   self.benchmark = RemoveEntities.new(self.n_entities)
 end
 
 local get_component = class(EchoesBenchmark)
@@ -98,6 +105,7 @@ end
 return {
    create_empty_entity = create_empty_entity,
    create_entities = create_entities,
+   remove_entities = remove_entities,
    get_component = get_component,
    get_components = get_components,
    add_component = add_component,

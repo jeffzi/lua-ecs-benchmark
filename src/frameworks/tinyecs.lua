@@ -59,12 +59,21 @@ function EntityFactory:setup(empty)
                x = 0.0,
                y = 0.0,
             },
-            Optional = {},
+            Optional = true,
          })
       end
 
       table.insert(self.entities, entity)
    end
+end
+
+local remove_entities = class(EntityFactory)
+
+function remove_entities:run()
+   for i = 1, #self.entities do
+      tiny.removeEntity(self.world, self.entities[i])
+   end
+   tiny.refresh(self.world)
 end
 
 local get_component = class(EntityFactory)
@@ -120,7 +129,7 @@ function add_components:run()
          x = 0.0,
          y = 0.0,
       }
-      entity.Optional = {}
+      entity.Optional = true
    end
 end
 
@@ -197,6 +206,7 @@ end
 return {
    create_empty_entity = create_empty_entity,
    create_entities = create_entities,
+   remove_entities = remove_entities,
    get_component = get_component,
    get_components = get_components,
    add_component = add_component,

@@ -15,12 +15,13 @@ local FRAMEWORKS = {
 local FRAMEWORK_NAMES = tablex.keys(FRAMEWORKS)
 
 local TESTS = {
-   "add_component",
-   "add_components",
    "create_empty_entity",
    "create_entities",
+   "remove_entities",
    "get_component",
    "get_components",
+   "add_component",
+   "add_components",
    "remove_component",
    "remove_components",
    "system_update",

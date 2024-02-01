@@ -65,6 +65,15 @@ function EntityFactory:setup(empty)
    end
 end
 
+local remove_entities = class(EntityFactory)
+
+function remove_entities:run()
+   for i = 1, #self.entities do
+      self.world:removeEntity(self.entities[i])
+   end
+   self.world:__flush()
+end
+
 local get_component = class(EntityFactory)
 
 function get_component:run()
@@ -173,6 +182,7 @@ end
 return {
    create_empty_entity = create_empty_entity,
    create_entities = create_entities,
+   remove_entities = remove_entities,
    get_component = get_component,
    get_components = get_components,
    add_component = add_component,

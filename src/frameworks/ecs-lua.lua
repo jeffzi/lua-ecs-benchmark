@@ -23,8 +23,7 @@ local Padding3 = Component()
 local ECSBenchmark = class(Benchmark)
 
 function ECSBenchmark:setup()
-   self.world = ECS.World()
-   self.world:SetFrequency(60)
+   self.world = ECS.World(nil, 60, false)
    self.timestep = 1
    self.dt = 1000 / 60 / 1000
 end
@@ -65,7 +64,10 @@ end
 local EntityFactory = class(ECSBenchmark)
 
 function EntityFactory:setup(empty)
-   self.world = ECS.World()
+   self.world = ECS.World(nil, 60, false)
+   self.timestep = 1
+   self.dt = 1000 / 60 / 1000
+
    self.entities = {}
    local entity
    for _ = 1, self.n_entities do
@@ -85,6 +87,15 @@ function EntityFactory:setup(empty)
       end
       table.insert(self.entities, entity)
    end
+end
+
+local remove_entities = class(EntityFactory)
+
+function remove_entities:run()
+   for i = 1, #self.entities do
+      self.world:Remove(self.entities[i])
+   end
+   self.world:Update("process", self.timestep * self.dt)
 end
 
 local get_component = class(EntityFactory)
@@ -163,6 +174,9 @@ end
 local system_update = class(ECSBenchmark)
 function system_update:setup()
    self.world = ECS.World(nil, 60, false)
+   self.timestep = 1
+   self.dt = 1000 / 60 / 1000
+
    local entity, padding, shuffle
    for i = 1, self.n_entities do
       entity = self.world:Entity(
@@ -215,6 +229,7 @@ end
 return {
    create_empty_entity = create_empty_entity,
    create_entities = create_entities,
+   remove_entities = remove_entities,
    get_component = get_component,
    get_components = get_components,
    add_component = add_component,

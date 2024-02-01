@@ -66,6 +66,17 @@ function EntityFactory:setup(empty)
    self.pool:flush()
 end
 
+local remove_entities = class(EntityFactory)
+
+function remove_entities:run()
+   for i = 1, #self.entities do
+      self.entities[i].dead = true
+   end
+   self.pool:remove(function(entity)
+      return entity.dead
+   end)
+end
+
 local get_component = class(EntityFactory)
 
 function get_component:run()

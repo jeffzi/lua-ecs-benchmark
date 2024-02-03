@@ -16,15 +16,15 @@ local Padding3 = Component.create("Padding3")
 
 local LovetoysBenchmark = class(Benchmark)
 
-function LovetoysBenchmark:setup()
+function LovetoysBenchmark:iteration_setup()
    self.engine = Engine()
 end
-function LovetoysBenchmark:teardown()
+function LovetoysBenchmark:iteration_teardown()
    self.engine = nil
 end
 
-local create_empty_entity = class(LovetoysBenchmark)
-function create_empty_entity:run()
+local add_empty_entity = class(LovetoysBenchmark)
+function add_empty_entity:run()
    local entity
    for _ = 1, self.n_entities do
       entity = Entity()
@@ -33,9 +33,9 @@ function create_empty_entity:run()
    end
 end
 
-local create_entities = class.create_entities(LovetoysBenchmark)
+local add_entities = class.add_entities(LovetoysBenchmark)
 
-function create_entities:run()
+function add_entities:run()
    local entity
    for _ = 1, self.n_entities do
       entity = Entity()
@@ -48,7 +48,7 @@ end
 
 local EntityFactory = class(LovetoysBenchmark)
 
-function EntityFactory:setup(empty)
+function EntityFactory:iteration_setup(empty)
    self.engine = Engine()
    self.entities = {}
    local entity
@@ -96,8 +96,8 @@ end
 
 local add_component = class(EntityFactory)
 
-function add_component:setup()
-   EntityFactory.setup(self, true)
+function add_component:iteration_setup()
+   EntityFactory.iteration_setup(self, true)
 end
 
 function add_component:run()
@@ -136,9 +136,9 @@ function remove_components:run()
    end
 end
 
-local system_update = class(LovetoysBenchmark)
+local system_update = class(Benchmark)
 
-function system_update:setup()
+function system_update:global_setup()
    self.engine = Engine()
    local entity, padding, shuffle
    for i = 1, self.n_entities do
@@ -184,13 +184,17 @@ function system_update:setup()
    self.engine:addSystem(MovementSystem())
 end
 
+function system_update:global_teardown()
+   self.engine = nil
+end
+
 function system_update:run()
    self.engine:update(1 / 60)
 end
 
 return {
-   create_empty_entity = create_empty_entity,
-   create_entities = create_entities,
+   add_empty_entity = add_empty_entity,
+   add_entities = add_entities,
    remove_entities = remove_entities,
    get_component = get_component,
    get_components = get_components,

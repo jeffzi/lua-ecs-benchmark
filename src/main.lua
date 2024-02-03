@@ -15,8 +15,8 @@ local FRAMEWORKS = {
 local FRAMEWORK_NAMES = tablex.keys(FRAMEWORKS)
 
 local TESTS = {
-   "create_empty_entity",
-   "create_entities",
+   "add_empty_entity",
+   "add_entities",
    "remove_entities",
    "get_component",
    "get_components",
@@ -27,10 +27,10 @@ local TESTS = {
    "system_update",
 }
 
-local N_ENTITIES = { 10, 100, 1000, 10000, 100000, 1000000 }
+local entities = { 10, 100, 1000, 10000, 100000 }
 
 local HEADERS = {
-   "n_entities",
+   "entities",
    "test",
    "framework",
    "unit",
@@ -83,11 +83,11 @@ local function main(output, frameworks, tests)
    tests = tests or TESTS
 
    local stats = {}
-   local total = tablex.size(frameworks) * tablex.size(tests) * tablex.size(N_ENTITIES)
+   local total = tablex.size(frameworks) * tablex.size(tests) * tablex.size(entities)
    local i = 0
    local framework, benchmark_cls, benchmark, row, extra
-   for _, n_entities in pairs(N_ENTITIES) do
-      extra = { n_entities = n_entities }
+   for _, n_entities in pairs(entities) do
+      extra = { entities = n_entities }
 
       for _, test_name in pairs(tests) do
          extra["test"] = test_name
@@ -111,10 +111,12 @@ local function main(output, frameworks, tests)
                extra["framework"] = framework_name
                benchmark = benchmark_cls(n_entities)
 
+               collectgarbage("collect")
                row = benchmark:timeit()
                extra["unit"] = "s"
                table.insert(stats, to_array2d(row, extra))
 
+               collectgarbage("collect")
                row = benchmark:memit()
                extra["unit"] = "kb"
                table.insert(stats, to_array2d(row, extra))

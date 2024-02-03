@@ -25,25 +25,27 @@ Component("Padding3")
 
 local ConcordBenchmark = class(Benchmark)
 
-function ConcordBenchmark:setup()
+function ConcordBenchmark:iteration_setup()
    self.world = World()
 end
-function ConcordBenchmark:teardown()
+
+function ConcordBenchmark:iteration_teardown()
    self.world:clear()
    self.world = nil
 end
 
-local create_empty_entity = class(ConcordBenchmark)
-function create_empty_entity:run()
+local add_empty_entity = class(ConcordBenchmark)
+
+function add_empty_entity:run()
    for _ = 1, self.n_entities do
       self.world:addEntity(Entity())
    end
    self.world:__flush()
 end
 
-local create_entities = class.create_entities(ConcordBenchmark)
+local add_entities = class.add_entities(ConcordBenchmark)
 
-function create_entities:run()
+function add_entities:run()
    for _ = 1, self.n_entities do
       self.world:addEntity(Entity():give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0))
    end
@@ -52,7 +54,7 @@ end
 
 local EntityFactory = class(ConcordBenchmark)
 
-function EntityFactory:setup(empty)
+function EntityFactory:iteration_setup(empty)
    self.world = World()
    self.entities = {}
    local entity
@@ -98,8 +100,8 @@ end
 
 local add_component = class(EntityFactory)
 
-function add_component:setup()
-   EntityFactory.setup(self, true)
+function add_component:iteration_setup()
+   EntityFactory.iteration_setup(self, true)
 end
 
 function add_component:run()
@@ -134,8 +136,8 @@ function remove_components:run()
    self.world:__flush()
 end
 
-local system_update = class(ConcordBenchmark)
-function system_update:setup()
+local system_update = class(Benchmark)
+function system_update:global_setup()
    self.world = World()
    local entity, padding, shuffle
    for i = 1, self.n_entities do
@@ -175,13 +177,18 @@ function system_update:setup()
    self.world:addSystems(MovementSystem)
 end
 
+function system_update:global_teardown()
+   self.world:clear()
+   self.world = nil
+end
+
 function system_update:run()
    self.world:emit("update", 1 / 60)
 end
 
 return {
-   create_empty_entity = create_empty_entity,
-   create_entities = create_entities,
+   add_empty_entity = add_empty_entity,
+   add_entities = add_entities,
    remove_entities = remove_entities,
    get_component = get_component,
    get_components = get_components,

@@ -5,26 +5,27 @@ local tiny = require("tiny")
 
 local TinyBenchmark = class(Benchmark)
 
-function TinyBenchmark:setup()
+function TinyBenchmark:iteration_setup()
    self.world = tiny.world()
 end
-function TinyBenchmark:teardown()
+
+function TinyBenchmark:iteration_teardown()
    tiny.clearEntities(self.world)
    tiny.clearSystems(self.world)
    self.world = nil
 end
 
-local create_empty_entity = class(TinyBenchmark)
-function create_empty_entity:run()
+local add_empty_entity = class(TinyBenchmark)
+function add_empty_entity:run()
    for _ = 1, self.n_entities do
       tiny.addEntity(self.world, {})
    end
    tiny.refresh(self.world)
 end
 
-local create_entities = class.create_entities(TinyBenchmark)
+local add_entities = class.add_entities(TinyBenchmark)
 
-function create_entities:run()
+function add_entities:run()
    for _ = 1, self.n_entities do
       tiny.addEntity(self.world, {
          Position = {
@@ -42,7 +43,7 @@ end
 
 local EntityFactory = class(TinyBenchmark)
 
-function EntityFactory:setup(empty)
+function EntityFactory:iteration_setup(empty)
    self.world = tiny.world()
    self.entities = {}
    local entity
@@ -100,8 +101,8 @@ end
 
 local add_component = class(EntityFactory)
 
-function add_component:setup()
-   EntityFactory.setup(self, true)
+function add_component:iteration_setup()
+   EntityFactory.iteration_setup(self, true)
 end
 
 function add_component:run()
@@ -152,9 +153,9 @@ function remove_components:run()
    end
 end
 
-local system_update = class(TinyBenchmark)
+local system_update = class(Benchmark)
 
-function system_update:setup()
+function system_update:global_setup()
    self.world = tiny.world()
    local entity, padding, shuffle
    for i = 1, self.n_entities do
@@ -199,13 +200,19 @@ function system_update:setup()
    tiny.addSystem(self.world, MovementSystem)
 end
 
+function system_update:global_teardown()
+   tiny.clearEntities(self.world)
+   tiny.clearSystems(self.world)
+   self.world = nil
+end
+
 function system_update:run()
    tiny.update(self.world, 1 / 60)
 end
 
 return {
-   create_empty_entity = create_empty_entity,
-   create_entities = create_entities,
+   add_empty_entity = add_empty_entity,
+   add_entities = add_entities,
    remove_entities = remove_entities,
    get_component = get_component,
    get_components = get_components,

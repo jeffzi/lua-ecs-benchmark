@@ -49,7 +49,7 @@ class HaxeBenchmark {
 	}
 }
 
-class CreateEmptyEntity extends HaxeBenchmark {
+class AddEmptyEntity extends HaxeBenchmark {
 	public function run():Void {
 		for (_ in 0...this.n_entities) {
 			new Entity();
@@ -57,7 +57,7 @@ class CreateEmptyEntity extends HaxeBenchmark {
 	}
 }
 
-class CreateEntities extends HaxeBenchmark {
+class AddEntities extends HaxeBenchmark {
 	public function run():Void {
 		for (_ in 0...this.n_entities) {
 			new Entity().add(new Position()).add(new Velocity());

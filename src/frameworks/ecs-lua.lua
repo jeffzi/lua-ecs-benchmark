@@ -22,19 +22,20 @@ local Padding3 = Component()
 
 local ECSBenchmark = class(Benchmark)
 
-function ECSBenchmark:setup()
+function ECSBenchmark:iteration_setup()
    self.world = ECS.World(nil, 60, false)
    self.timestep = 1
    self.dt = 1000 / 60 / 1000
 end
 
-function ECSBenchmark:teardown()
+function ECSBenchmark:iteration_teardown()
    self.world:Destroy()
    self.world = nil
 end
 
-local create_empty_entity = class(ECSBenchmark)
-function create_empty_entity:run()
+local add_empty_entity = class(ECSBenchmark)
+
+function add_empty_entity:run()
    for _ = 1, self.n_entities do
       self.world:Entity()
    end
@@ -42,9 +43,9 @@ function create_empty_entity:run()
    self.world:Update("process", self.timestep * self.dt)
 end
 
-local create_entities = class.create_entities(ECSBenchmark)
+local add_entities = class.add_entities(ECSBenchmark)
 
-function create_entities:run()
+function add_entities:run()
    for _ = 1, self.n_entities do
       self.world:Entity(
          Position({
@@ -63,7 +64,7 @@ end
 
 local EntityFactory = class(ECSBenchmark)
 
-function EntityFactory:setup(empty)
+function EntityFactory:iteration_setup(empty)
    self.world = ECS.World(nil, 60, false)
    self.timestep = 1
    self.dt = 1000 / 60 / 1000
@@ -121,8 +122,8 @@ end
 
 local add_component = class(EntityFactory)
 
-function add_component:setup()
-   EntityFactory.setup(self, true)
+function add_component:iteration_setup()
+   EntityFactory.iteration_setup(self, true)
 end
 
 function add_component:run()
@@ -171,8 +172,8 @@ function remove_components:run()
    end
 end
 
-local system_update = class(ECSBenchmark)
-function system_update:setup()
+local system_update = class(Benchmark)
+function system_update:global_setup()
    self.world = ECS.World(nil, 60, false)
    self.timestep = 1
    self.dt = 1000 / 60 / 1000
@@ -221,14 +222,19 @@ function system_update:setup()
    self.world:AddSystem(MovementSystem)
 end
 
+function system_update:global_teardown()
+   self.world:Destroy()
+   self.world = nil
+end
+
 function system_update:run()
    self.timestep = self.timestep + 1
    self.world:Update("process", self.timestep * self.dt)
 end
 
 return {
-   create_empty_entity = create_empty_entity,
-   create_entities = create_entities,
+   add_empty_entity = add_empty_entity,
+   add_entities = add_entities,
    remove_entities = remove_entities,
    get_component = get_component,
    get_components = get_components,

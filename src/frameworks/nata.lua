@@ -5,24 +5,24 @@ local nata = require("lib.nata.nata")
 
 local NataBenchmark = class(Benchmark)
 
-function NataBenchmark:setup()
+function NataBenchmark:iteration_setup()
    self.pool = nata.new()
 end
-function NataBenchmark:teardown()
+function NataBenchmark:iteration_teardown()
    self.pool = nil
 end
 
-local create_empty_entity = class(NataBenchmark)
-function create_empty_entity:run()
+local add_empty_entity = class(NataBenchmark)
+function add_empty_entity:run()
    for _ = 1, self.n_entities do
       self.pool:queue({})
    end
    self.pool:flush()
 end
 
-local create_entities = class.create_entities(NataBenchmark)
+local add_entities = class.add_entities(NataBenchmark)
 
-function create_entities:run()
+function add_entities:run()
    for _ = 1, self.n_entities do
       self.pool:queue({
          Position = {
@@ -40,7 +40,7 @@ end
 
 local EntityFactory = class(NataBenchmark)
 
-function EntityFactory:setup(empty)
+function EntityFactory:iteration_setup(empty)
    self.pool = nata.new()
    self.entities = {}
    local entity
@@ -101,8 +101,8 @@ end
 
 local add_component = class(EntityFactory)
 
-function add_component:setup()
-   EntityFactory.setup(self, true)
+function add_component:iteration_setup()
+   EntityFactory.iteration_setup(self, true)
 end
 
 function add_component:run()
@@ -155,7 +155,7 @@ end
 
 local system_update = class(NataBenchmark)
 
-function system_update:setup()
+function system_update:global_setup()
    local MovementSystem = {}
 
    function MovementSystem:update(dt)
@@ -209,13 +209,17 @@ function system_update:setup()
    self.pool:flush()
 end
 
+function system_update:global_teardown()
+   self.pool = nil
+end
+
 function system_update:run()
    self.pool:emit("update", 1 / 60)
 end
 
 return {
-   create_empty_entity = create_empty_entity,
-   create_entities = create_entities,
+   add_empty_entity = add_empty_entity,
+   add_entities = add_entities,
    get_component = get_component,
    get_components = get_components,
    add_component = add_component,

@@ -21,8 +21,8 @@ end
 local haxe_path = "src/haxe/transpiled.lua"
 fix_haxe_lua(haxe_path, {
    "HaxeBenchmark",
-   "CreateEmptyEntity",
-   "CreateEntities",
+   "AddEmptyEntity",
+   "AddEntities",
    "RemoveEntities",
    "GetComponent",
    "GetComponents",
@@ -36,75 +36,84 @@ dofile(haxe_path)
 
 local EchoesBenchmark = class(Benchmark)
 
-function EchoesBenchmark:teardown()
-   self.benchmark.teardown()
+function EchoesBenchmark:iteration_teardown()
+   self.benchmark.iteration_teardown()
 end
+
 function EchoesBenchmark:run()
    self.benchmark:run()
 end
 
-local create_empty_entity = class(EchoesBenchmark)
+local add_empty_entity = class(EchoesBenchmark)
 
-function create_empty_entity:setup()
-   self.benchmark = CreateEmptyEntity.new(self.n_entities)
+function add_empty_entity:iteration_setup()
+   self.benchmark = AddEmptyEntity.new(self.n_entities)
 end
 
-local create_entities = class.create_entities(EchoesBenchmark)
+local add_entities = class.add_entities(EchoesBenchmark)
 
-function create_entities:setup()
-   self.benchmark = CreateEntities.new(self.n_entities)
+function add_entities:iteration_setup()
+   self.benchmark = AddEntities.new(self.n_entities)
 end
 
 local remove_entities = class(EchoesBenchmark)
 
-function remove_entities:setup()
+function remove_entities:iteration_setup()
    self.benchmark = RemoveEntities.new(self.n_entities)
 end
 
 local get_component = class(EchoesBenchmark)
 
-function get_component:setup()
+function get_component:iteration_setup()
    self.benchmark = GetComponent.new(self.n_entities)
 end
 
 local get_components = class(EchoesBenchmark)
-function get_components:setup()
+function get_components:iteration_setup()
    self.benchmark = GetComponents.new(self.n_entities)
 end
 
 local add_component = class(EchoesBenchmark)
 
-function add_component:setup()
+function add_component:iteration_setup()
    self.benchmark = AddComponent.new(self.n_entities, true)
 end
 
 local add_components = class(EchoesBenchmark)
 
-function add_components:setup()
+function add_components:iteration_setup()
    self.benchmark = AddComponents.new(self.n_entities, true)
 end
 
 local remove_component = class(EchoesBenchmark)
 
-function remove_component:setup()
+function remove_component:iteration_setup()
    self.benchmark = RemoveComponent.new(self.n_entities)
 end
 
 local remove_components = class(EchoesBenchmark)
 
-function remove_components:setup()
+function remove_components:iteration_setup()
    self.benchmark = RemoveComponents.new(self.n_entities)
 end
 
-local system_update = class(EchoesBenchmark)
+local system_update = class(Benchmark)
 
-function system_update:setup()
+function system_update:global_setup()
    self.benchmark = SystemUpdate.new(self.n_entities)
 end
 
+function system_update:global_teardown()
+   self.benchmark.iteration_teardown()
+end
+
+function system_update:run()
+   self.benchmark:run()
+end
+
 return {
-   create_empty_entity = create_empty_entity,
-   create_entities = create_entities,
+   add_empty_entity = add_empty_entity,
+   add_entities = add_entities,
    remove_entities = remove_entities,
    get_component = get_component,
    get_components = get_components,

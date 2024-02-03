@@ -1,0 +1,71 @@
+version: 3
+
+silent: true
+
+vars:
+  OUT_DIR: results
+  CSV: benchmarks.csv
+  BENCHMARK_PATH: "{{joinPath .OUT_DIR .CSV}}"
+
+tasks:
+  default:
+    desc: Benchmark all frameworks and export the plots.
+    cmds:
+      - task: benchmark
+      - task: export
+
+  init-subtrees:
+    internal: true
+    desc: Init git subtrees, required for some dependencies.
+    cmds:
+      - git submodule init
+      - git submodule update
+
+  install-deps:
+    internal: true
+    desc: Install lua and haxe dependencies.
+    cmds:
+      - luarocks list --porcelain argparse | grep -q "installed" || luarocks install argparse
+      - luarocks list --porcelain chronos | grep -q "installed" || luarocks install chronos
+      - luarocks list --porcelain lovetoys | grep -q "installed" || luarocks install lovetoys
+      - luarocks list --porcelain luamark | grep -q "installed" || luarocks install luamark
+      - luarocks list --porcelain penlight | grep -q "installed" || luarocks install penlight
+      - luarocks list --porcelain tiny-ecs | grep -q "installed" || luarocks install tiny-ecs
+      # haxe dependencies
+      - luarocks list --porcelain luasocket | grep -q "installed" || luarocks install luasocket
+      - luarocks list --porcelain luv | grep -q "installed" || luarocks install luv
+      - luarocks list --porcelain luautf8 | grep -q "installed" || luarocks install luautf8
+      - haxelib list | grep -q "^echoes:" || haxelib install --quiet --always echoes
+    preconditions:
+      - sh: luarocks --version
+        msg: You must have luarocks installed.
+      - sh: haxe --version
+        msg: You must have haxe installed.
+      - sh: pdm --version
+        msg: You must have pdm installed.
+
+  benchmark:
+    desc: Benchmark all frameworks.
+    deps:
+      - init-subtrees
+      - install-deps
+    cmds:
+      - echo "Running Benchmarks"
+      - lua src/main.lua -o "{{.BENCHMARK_PATH}}"
+
+  install-py-deps:
+    internal: true
+    desc: Install lua and haxe dependencies.
+    cmds:
+      - pdm install --quiet
+    preconditions:
+      - sh: pdm --version
+        msg: You must have pdm installed.
+
+  export:
+    desc: Export plots and markdown.
+    deps:
+      - install-py-deps
+    cmds:
+      - echo "Exporting Results"
+      - pdm run scripts/export.py {{.BENCHMARK_PATH}} {{.OUT_DIR}}

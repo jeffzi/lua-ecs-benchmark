@@ -69,16 +69,16 @@ def _export_markdown(df: pd.DataFrame, out_path: Path) -> None:
         .replace(
             {
                 DEFAULT_TIME_UNIT: "Execution Time",
-                DEFAULT_MEMORY_UNIT: "Memory consumption",
+                DEFAULT_MEMORY_UNIT: "Memory Usage",
             }
         )
     )
 
     mds = []
     for entities in df["entities"].unique():
-        mds.append(f"## {entities} entities")
+        mds.append(f"### {entities} entities")
         for unit in df["unit"].unique():
-            mds.append(f"### {unit}")
+            mds.append(f"#### {unit}")
             table = df[(df["entities"] == entities) & (df["unit"] == unit)].drop(
                 columns=["unit", "entities"]
             )

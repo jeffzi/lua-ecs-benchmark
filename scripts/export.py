@@ -124,9 +124,9 @@ def _to_markdown_tables(df: pd.DataFrame) -> str:
 
     mds = []
     for entities in df["entities"].unique():
-        mds.append(f"### {entities} entities")
+        mds.append(f"#### {entities} entities")
         for unit in df["unit"].unique():
-            mds.append(f"#### {unit}")
+            mds.append(f"##### {unit}")
             table = df[(df["entities"] == entities) & (df["unit"] == unit)].drop(
                 columns=["unit", "entities"]
             )

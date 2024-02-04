@@ -1,6 +1,6 @@
-### 10 entities
+#### 10 entities
 
-#### Execution Time
+##### Execution Time
 
 | test              | concord   | echoes      | ecs-lua | lovetoys   | nata      | tinyecs     |
 | :---------------- | :-------- | :---------- | :------ | :--------- | :-------- | :---------- |
@@ -15,7 +15,7 @@
 | remove_entities   | 3.6 µs    | 6.14 µs     | 559 ns  | **406 ns** |           | 1.39 µs     |
 | system_update     | 242 ns    | 211 ns      | 1.13 µs | 205 ns     | 303 ns    | **76 ns**   |
 
-#### Memory Usage
+##### Memory Usage
 
 | test              | concord | echoes    | ecs-lua | lovetoys | nata       | tinyecs    |
 | :---------------- | :------ | :-------- | :------ | :------- | :--------- | :--------- |
@@ -30,9 +30,9 @@
 | remove_entities   | 918 B   | 4.8 kB    | 1.1 kB  | **0 B**  |            | 703 B      |
 | system_update     | **0 B** | 43 B      | 2.2 kB  | 0 B      | 117 B      | 0 B        |
 
-### 100 entities
+#### 100 entities
 
-#### Execution Time
+##### Execution Time
 
 | test              | concord | echoes      | ecs-lua     | lovetoys | nata    | tinyecs     |
 | :---------------- | :------ | :---------- | :---------- | :------- | :------ | :---------- |
@@ -47,7 +47,7 @@
 | remove_entities   | 97.5 µs | 111 µs      | **1.91 µs** | 11.6 µs  |         | 20.3 µs     |
 | system_update     | 391 ns  | 286 ns      | 2.92 µs     | 671 ns   | 299 ns  | **242 ns**  |
 
-#### Memory Usage
+##### Memory Usage
 
 | test              | concord | echoes     | ecs-lua  | lovetoys | nata    | tinyecs     |
 | :---------------- | :------ | :--------- | :------- | :------- | :------ | :---------- |
@@ -62,9 +62,9 @@
 | remove_entities   | 11.2 kB | 47.7 kB    | 1.2 kB   | **0 B**  |         | 5.1 kB      |
 | system_update     | **0 B** | 51 B       | 9.7 kB   | 0 B      | 117 B   | 0 B         |
 
-### 1000 entities
+#### 1000 entities
 
-#### Execution Time
+##### Execution Time
 
 | test              | concord | echoes      | ecs-lua     | lovetoys | nata        | tinyecs     |
 | :---------------- | :------ | :---------- | :---------- | :------- | :---------- | :---------- |
@@ -79,7 +79,7 @@
 | remove_entities   | 631 µs  | 1.1 ms      | **8.61 µs** | 111 µs   |             | 193 µs      |
 | system_update     | 5.5 µs  | 12.3 µs     | 23 µs       | 12.5 µs  | **290 ns**  | 4.65 µs     |
 
-#### Memory Usage
+##### Memory Usage
 
 | test              | concord  | echoes      | ecs-lua  | lovetoys | nata     | tinyecs      |
 | :---------------- | :------- | :---------- | :------- | :------- | :------- | :----------- |
@@ -94,9 +94,9 @@
 | remove_entities   | 76.6 kB  | 476.6 kB    | 1.2 kB   | **0 B**  |          | 40.1 kB      |
 | system_update     | **0 B**  | 93 B        | 87.1 kB  | 0 B      | 117 B    | 0 B          |
 
-### 10000 entities
+#### 10000 entities
 
-#### Execution Time
+##### Execution Time
 
 | test              | concord | echoes      | ecs-lua    | lovetoys | nata       | tinyecs     |
 | :---------------- | :------ | :---------- | :--------- | :------- | :--------- | :---------- |
@@ -111,7 +111,7 @@
 | remove_entities   | 5.36 ms | 11.7 ms     | **110 µs** | 1.14 ms  |            | 2.08 ms     |
 | system_update     | 60.7 µs | 122 µs      | 253 µs     | 134 µs   | **299 ns** | 45.2 µs     |
 
-#### Memory Usage
+##### Memory Usage
 
 | test              | concord  | echoes       | ecs-lua  | lovetoys | nata   | tinyecs    |
 | :---------------- | :------- | :----------- | :------- | :------- | :----- | :--------- |
@@ -126,9 +126,9 @@
 | remove_entities   | 930.1 kB | 4.8 MB       | 1.2 kB   | **0 B**  |        | 576.1 kB   |
 | system_update     | **0 B**  | 93 B         | 860.6 kB | 0 B      | 117 B  | 0 B        |
 
-### 100000 entities
+#### 100000 entities
 
-#### Execution Time
+##### Execution Time
 
 | test              | concord | echoes      | ecs-lua     | lovetoys | nata | tinyecs     |
 | :---------------- | :------ | :---------- | :---------- | :------- | :--- | :---------- |
@@ -143,7 +143,7 @@
 | remove_entities   | 71.7 ms | 115 ms      | **3.18 ms** | 11 ms    |      | 19.7 ms     |
 | system_update     | 3.53 ms | 5.75 ms     | 12 ms       | 6.41 ms  |      | **1.23 ms** |
 
-#### Memory Usage
+##### Memory Usage
 
 | test              | concord | echoes     | ecs-lua  | lovetoys | nata | tinyecs     |
 | :---------------- | :------ | :--------- | :------- | :------- | :--- | :---------- |

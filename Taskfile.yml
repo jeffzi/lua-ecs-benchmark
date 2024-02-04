@@ -4,7 +4,7 @@ silent: true
 
 vars:
   OUT_DIR: results
-  CSV: benchmarks.csv
+  CSV: results.csv
   BENCHMARK_PATH: "{{joinPath .OUT_DIR .CSV}}"
 
 tasks:
@@ -18,8 +18,7 @@ tasks:
     internal: true
     desc: Init git subtrees, required for some dependencies.
     cmds:
-      - git submodule init
-      - git submodule update
+      - git submodule update --init
 
   install-deps:
     internal: true
@@ -38,11 +37,9 @@ tasks:
       - haxelib list | grep -q "^echoes:" || haxelib install --quiet --always echoes
     preconditions:
       - sh: luarocks --version
-        msg: You must have luarocks installed.
+        msg: luuarocks not found in PATH.
       - sh: haxe --version
-        msg: You must have haxe installed.
-      - sh: pdm --version
-        msg: You must have pdm installed.
+        msg: haxelib not found in PATH.
 
   benchmark:
     desc: Benchmark all frameworks.
@@ -60,7 +57,7 @@ tasks:
       - pdm install --quiet
     preconditions:
       - sh: pdm --version
-        msg: You must have pdm installed.
+        msg: pdm not found in PATH.
 
   export:
     desc: Export plots and markdown.

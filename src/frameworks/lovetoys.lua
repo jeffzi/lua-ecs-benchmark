@@ -25,24 +25,24 @@ end
 
 local add_empty_entity = class(LovetoysBenchmark)
 function add_empty_entity:run()
-   local entity
+   local engine = self.engine
    for _ = 1, self.n_entities do
-      entity = Entity()
+      local entity = Entity()
       entity:initialize()
-      self.engine:addEntity(entity)
+      engine:addEntity(entity)
    end
 end
 
 local add_entities = class.add_entities(LovetoysBenchmark)
 
 function add_entities:run()
-   local entity
+   local engine = self.engine
    for _ = 1, self.n_entities do
-      entity = Entity()
+      local entity = Entity()
       entity:initialize()
       entity:add(Position(0, 0))
       entity:add(Velocity(0, 0))
-      self.engine:addEntity(entity)
+      engine:addEntity(entity)
    end
 end
 
@@ -66,29 +66,30 @@ end
 local remove_entities = class(EntityFactory)
 
 function remove_entities:run()
-   for i = 1, #self.entities do
-      self.engine:removeEntity(self.entities[i])
+   local engine, entities = self.engine, self.entities
+   for i = 1, #entities do
+      engine:removeEntity(entities[i])
    end
 end
 
 local get_component = class(EntityFactory)
 
 function get_component:run()
-   --luacheck: ignore
-   local component
-   for i = 1, #self.entities do
-      component = self.entities[i]:get("Position")
+   local entities = self.entities
+   for i = 1, #entities do
+      --luacheck: ignore
+      local component = entities[i]:get("Position")
    end
 end
 
 local get_components = class(EntityFactory)
 
 function get_components:run()
-   --luacheck: ignore
-   local component, entity, all_components
-   for i = 1, #self.entities do
-      entity = self.entities[i]
-      component = entity:get("Position")
+   local entities = self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
+      --luacheck: ignore
+      local component = entity:get("Position")
       component = entity:get("Velocity")
       component = entity:get("Optional")
    end
@@ -101,17 +102,18 @@ function add_component:iteration_setup()
 end
 
 function add_component:run()
-   for i = 1, #self.entities do
-      self.entities[i]:add(Position(0, 0))
+   local entities = self.entities
+   for i = 1, #entities do
+      entities[i]:add(Position(0, 0))
    end
 end
 
 local add_components = class(add_component)
 
 function add_components:run()
-   local entity
-   for i = 1, #self.entities do
-      entity = self.entities[i]
+   local entities = self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
       entity:addMultiple({ Position(0, 0), Velocity(0, 0), Optional() })
    end
 end
@@ -119,17 +121,18 @@ end
 local remove_component = class(EntityFactory)
 
 function remove_component:run()
-   for i = 1, #self.entities do
-      self.entities[i]:remove("Position")
+   local entities = self.entities
+   for i = 1, #entities do
+      entities[i]:remove("Position")
    end
 end
 
 local remove_components = class(EntityFactory)
 
 function remove_components:run()
-   local entity
-   for i = 1, #self.entities do
-      entity = self.entities[i]
+   local entities = self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
       entity:remove("Position")
       entity:remove("Velocity")
       entity:remove("Optional")

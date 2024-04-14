@@ -36,18 +36,20 @@ end
 local add_empty_entity = class(ECSBenchmark)
 
 function add_empty_entity:run()
+   local world, timestep = self.world, self.timestep + 1
    for _ = 1, self.n_entities do
-      self.world:Entity()
+      world:Entity()
    end
-   self.timestep = self.timestep + 1
-   self.world:Update("process", self.timestep * self.dt)
+   world:Update("process", timestep * self.dt)
+   self.timestep = timestep
 end
 
 local add_entities = class.add_entities(ECSBenchmark)
 
 function add_entities:run()
+   local world, timestep = self.world, self.timestep + 1
    for _ = 1, self.n_entities do
-      self.world:Entity(
+      world:Entity(
          Position({
             x = 0.0,
             y = 0.0,
@@ -58,8 +60,8 @@ function add_entities:run()
          })
       )
    end
-   self.timestep = self.timestep + 1
-   self.world:Update("process", self.timestep * self.dt)
+   world:Update("process", timestep * self.dt)
+   self.timestep = timestep
 end
 
 local EntityFactory = class(ECSBenchmark)
@@ -93,8 +95,9 @@ end
 local remove_entities = class(EntityFactory)
 
 function remove_entities:run()
-   for i = 1, #self.entities do
-      self.world:Remove(self.entities[i])
+   local entities = self.entities
+   for i = 1, #entities do
+      self.world:Remove(entities[i])
    end
    self.world:Update("process", self.timestep * self.dt)
 end
@@ -102,21 +105,21 @@ end
 local get_component = class(EntityFactory)
 
 function get_component:run()
-   --luacheck: ignore
-   local component
-   for i = 1, #self.entities do
-      component = self.entities[i][Position]
+   local entities = self.entities
+   for i = 1, #entities do
+      --luacheck: ignore
+      local component = entities[i][Position]
    end
 end
 
 local get_components = class(EntityFactory)
 
 function get_components:run()
-   --luacheck: ignore
-   local components, entity
-   for i = 1, #self.entities do
-      entity = self.entities[i]
-      components = entity:Get(Position, Velocity, Position)
+   local entities = self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
+      --luacheck: ignore
+      local components = entity:Get(Position, Velocity, Position)
    end
 end
 
@@ -127,9 +130,9 @@ function add_component:iteration_setup()
 end
 
 function add_component:run()
-   --luacheck: ignore
-   for i = 1, #self.entities do
-      self.entities[i].Position = Position({
+   local entities = self.entities
+   for i = 1, #entities do
+      entities[i].Position = Position({
          x = 0.0,
          y = 0.0,
       })
@@ -139,9 +142,9 @@ end
 local add_components = class(add_component)
 
 function add_components:run()
-   --luacheck: ignore
-   for i = 1, #self.entities do
-      self.entities[i]:Set(
+   local entities = self.entities
+   for i = 1, #entities do
+      entities[i]:Set(
          Position({
             x = 0.0,
             y = 0.0,
@@ -158,17 +161,19 @@ end
 local remove_component = class(EntityFactory)
 
 function remove_component:run()
-   for i = 1, #self.entities do
+   local entities = self.entities
+   for i = 1, #entities do
       -- = nil doesn't work
-      self.entities[i]:Unset(Position)
+      entities[i]:Unset(Position)
    end
 end
 
 local remove_components = class(EntityFactory)
 
 function remove_components:run()
-   for i = 1, #self.entities do
-      self.entities[i]:Unset(Position, Velocity, Optional)
+   local entities = self.entities
+   for i = 1, #entities do
+      entities[i]:Unset(Position, Velocity, Optional)
    end
 end
 
@@ -228,8 +233,9 @@ function system_update:global_teardown()
 end
 
 function system_update:run()
-   self.timestep = self.timestep + 1
-   self.world:Update("process", self.timestep * self.dt)
+   local timestep = self.timestep + 1
+   self.world:Update("process", timestep * self.dt)
+   self.timestep = timestep
 end
 
 return {

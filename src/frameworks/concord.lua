@@ -46,10 +46,11 @@ end
 local add_entities = class.add_entities(ConcordBenchmark)
 
 function add_entities:run()
+   local world = self.world
    for _ = 1, self.n_entities do
-      self.world:addEntity(Entity():give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0))
+      world:addEntity(Entity():give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0))
    end
-   self.world:__flush()
+   world:__flush()
 end
 
 local EntityFactory = class(ConcordBenchmark)
@@ -70,29 +71,30 @@ end
 local remove_entities = class(EntityFactory)
 
 function remove_entities:run()
-   for i = 1, #self.entities do
-      self.world:removeEntity(self.entities[i])
+   local world, entities = self.world, self.entities
+   for i = 1, #entities do
+      world:removeEntity(entities[i])
    end
-   self.world:__flush()
+   world:__flush()
 end
 
 local get_component = class(EntityFactory)
 
 function get_component:run()
    --luacheck: ignore
-   local component
-   for i = 1, #self.entities do
-      component = self.entities[i].Position
+   local entities = self.entities
+   for i = 1, #entities do
+      local component = entities[i].Position
    end
 end
 
 local get_components = class(EntityFactory)
 function get_components:run()
-   --luacheck: ignore
-   local component, entity, all_components
-   for i = 1, #self.entities do
-      entity = self.entities[i]
-      component = entity.Position
+   local entities = self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
+      --luacheck: ignore
+      local component = entity.Position
       component = entity.Velocity
       component = entity.Optional
    end
@@ -105,24 +107,27 @@ function add_component:iteration_setup()
 end
 
 function add_component:run()
-   for i = 1, #self.entities do
-      self.entities[i]:give("Position", 0.0, 0.0)
+   local entities = self.entities
+   for i = 1, #entities do
+      entities[i]:give("Position", 0.0, 0.0)
    end
 end
 
 local add_components = class(add_component)
 
 function add_components:run()
-   for i = 1, #self.entities do
-      self.entities[i]:give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0):give("Optional")
+   local entities = self.entities
+   for i = 1, #entities do
+      entities[i]:give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0):give("Optional")
    end
 end
 
 local remove_component = class(EntityFactory)
 
 function remove_component:run()
-   for i = 1, #self.entities do
-      self.entities[i]:remove("Position")
+   local entities = self.entities
+   for i = 1, #entities do
+      entities[i]:remove("Position")
    end
    self.world:__flush()
 end
@@ -130,8 +135,9 @@ end
 local remove_components = class(EntityFactory)
 
 function remove_components:run()
-   for i = 1, #self.entities do
-      self.entities[i]:remove("Position"):remove("Velocity"):remove("Optional")
+   local entities = self.entities
+   for i = 1, #entities do
+      entities[i]:remove("Position"):remove("Velocity"):remove("Optional")
    end
    self.world:__flush()
 end

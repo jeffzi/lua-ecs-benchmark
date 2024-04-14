@@ -3,6 +3,9 @@ local Benchmark = require("src.Benchmark")
 local class = require("pl.class")
 local tiny = require("tiny")
 
+local tiny_addEntity, tiny_removeEntity = tiny.addEntity, tiny.removeEntity
+local tiny_refresh, tiny_update = tiny.refresh, tiny.update
+
 local TinyBenchmark = class(Benchmark)
 
 function TinyBenchmark:iteration_setup()
@@ -17,17 +20,19 @@ end
 
 local add_empty_entity = class(TinyBenchmark)
 function add_empty_entity:run()
+   local world = self.world
    for _ = 1, self.n_entities do
-      tiny.addEntity(self.world, {})
+      tiny_addEntity(world, {})
    end
-   tiny.refresh(self.world)
+   tiny_refresh(world)
 end
 
 local add_entities = class.add_entities(TinyBenchmark)
 
 function add_entities:run()
+   local world = self.world
    for _ = 1, self.n_entities do
-      tiny.addEntity(self.world, {
+      tiny_addEntity(world, {
          Position = {
             x = 0.0,
             y = 0.0,
@@ -38,7 +43,7 @@ function add_entities:run()
          },
       })
    end
-   tiny.refresh(self.world)
+   tiny_refresh(world)
 end
 
 local EntityFactory = class(TinyBenchmark)
@@ -49,9 +54,9 @@ function EntityFactory:iteration_setup(empty)
    local entity
    for _ = 1, self.n_entities do
       if empty then
-         entity = tiny.addEntity(self.world, {})
+         entity = {}
       else
-         entity = tiny.addEntity(self.world, {
+         entity = tiny_addEntity(self.world, {
             Position = {
                x = 0.0,
                y = 0.0,
@@ -63,7 +68,7 @@ function EntityFactory:iteration_setup(empty)
             Optional = true,
          })
       end
-
+      entity = tiny_addEntity(self.world, entity)
       table.insert(self.entities, entity)
    end
 end
@@ -71,29 +76,30 @@ end
 local remove_entities = class(EntityFactory)
 
 function remove_entities:run()
-   for i = 1, #self.entities do
-      tiny.removeEntity(self.world, self.entities[i])
+   local world, entities = self.world, self.entities
+   for i = 1, #entities do
+      tiny_removeEntity(world, entities[i])
    end
-   tiny.refresh(self.world)
+   tiny_refresh(world)
 end
 
 local get_component = class(EntityFactory)
 
 function get_component:run()
    --luacheck: ignore
-   local component
-   for i = 1, #self.entities do
-      component = self.entities[i].Position
+   local entities = self.entities
+   for i = 1, #entities do
+      local component = entities[i].Position
    end
 end
 
 local get_components = class(EntityFactory)
 function get_components:run()
    --luacheck: ignore
-   local component, entity
-   for i = 1, #self.entities do
-      entity = self.entities[i]
-      component = entity.Position
+   local entities = self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
+      local component = entity.Position
       component = entity.Velocity
       component = entity.Optional
    end
@@ -107,21 +113,25 @@ end
 
 function add_component:run()
    --luacheck: ignore
-   for i = 1, #self.entities do
-      self.entities[i].Position = {
+   local world, entities = self.world, self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
+      entity.Position = {
          x = 0.0,
          y = 0.0,
       }
+      tiny_addEntity(world, entity)
    end
+   -- tiny_refresh(world)
 end
 
 local add_components = class(add_component)
 
 function add_components:run()
    --luacheck: ignore
-   local entity
-   for i = 1, #self.entities do
-      entity = self.entities[i]
+   local world, entities = self.world, self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
       entity.Position = {
          x = 0.0,
          y = 0.0,
@@ -131,26 +141,35 @@ function add_components:run()
          y = 0.0,
       }
       entity.Optional = true
+      tiny_addEntity(world, entity)
    end
+   tiny_refresh(world)
 end
 
 local remove_component = class(EntityFactory)
 
 function remove_component:run()
-   for i = 1, #self.entities do
-      self.entities[i].Position = nil
+   local world, entities = self.world, self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
+      entity.Position = nil
+      tiny_addEntity(world, entity)
    end
+   tiny_refresh(world)
 end
 
 local remove_components = class(EntityFactory)
 
 function remove_components:run()
-   for i = 1, #self.entities do
-      local entity = self.entities[i]
+   local world, entities = self.world, self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
       entity.Position = nil
       entity.Velocity = nil
       entity.Optional = nil
+      tiny_addEntity(world, entity)
    end
+   tiny_refresh(world)
 end
 
 local system_update = class(Benchmark)
@@ -159,7 +178,7 @@ function system_update:global_setup()
    self.world = tiny.world()
    local entity, padding, shuffle
    for i = 1, self.n_entities do
-      entity = tiny.addEntity(self.world, {
+      entity = tiny_addEntity(self.world, {
          Position = {
             x = 0.0,
             y = 0.0,
@@ -207,7 +226,7 @@ function system_update:global_teardown()
 end
 
 function system_update:run()
-   tiny.update(self.world, 1 / 60)
+   tiny_update(self.world, 1 / 60)
 end
 
 return {

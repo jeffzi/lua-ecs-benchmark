@@ -14,17 +14,19 @@ end
 
 local add_empty_entity = class(NataBenchmark)
 function add_empty_entity:run()
+   local pool = self.pool
    for _ = 1, self.n_entities do
-      self.pool:queue({})
+      pool:queue({})
    end
-   self.pool:flush()
+   pool:flush()
 end
 
 local add_entities = class.add_entities(NataBenchmark)
 
 function add_entities:run()
+   local pool = self.pool
    for _ = 1, self.n_entities do
-      self.pool:queue({
+      pool:queue({
          Position = {
             x = 0.0,
             y = 0.0,
@@ -35,7 +37,7 @@ function add_entities:run()
          },
       })
    end
-   self.pool:flush()
+   pool:flush()
 end
 
 local EntityFactory = class(NataBenchmark)
@@ -68,32 +70,35 @@ end
 
 local remove_entities = class(EntityFactory)
 
+local function should_remove(entity)
+   return entity.dead
+end
+
 function remove_entities:run()
-   for i = 1, #self.entities do
-      self.entities[i].dead = true
+   local pool, entities = self.pool, self.entities
+   for i = 1, #entities do
+      entities[i].dead = true
    end
-   self.pool:remove(function(entity)
-      return entity.dead
-   end)
+   pool:remove(should_remove)
 end
 
 local get_component = class(EntityFactory)
 
 function get_component:run()
-   --luacheck: ignore
-   local component
-   for i = 1, #self.entities do
-      component = self.entities[i].Position
+   local entities = self.entities
+   for i = 1, #entities do
+      --luacheck: ignore
+      local component = entities[i].Position
    end
 end
 
 local get_components = class(EntityFactory)
 function get_components:run()
-   --luacheck: ignore
-   local component, entity
-   for i = 1, #self.entities do
-      entity = self.entities[i]
-      component = entity.Position
+   local entities = self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
+      --luacheck: ignore
+      local component = entity.Position
       component = entity.Velocity
       component = entity.Optional
    end
@@ -106,22 +111,24 @@ function add_component:iteration_setup()
 end
 
 function add_component:run()
-   --luacheck: ignore
-   for i = 1, #self.entities do
-      self.entities[i].Position = {
+   local pool, entities = self.pool, self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
+      entity.Position = {
          x = 0.0,
          y = 0.0,
       }
+      pool:queue(entity)
    end
+   pool:flush()
 end
 
 local add_components = class(add_component)
 
 function add_components:run()
-   --luacheck: ignore
-   local entity
-   for i = 1, #self.entities do
-      entity = self.entities[i]
+   local pool, entities = self.pool, self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
       entity.Position = {
          x = 0.0,
          y = 0.0,
@@ -131,26 +138,36 @@ function add_components:run()
          y = 0.0,
       }
       entity.Optional = {}
+      pool:queue(entity)
    end
+   pool:flush()
 end
 
 local remove_component = class(EntityFactory)
 
 function remove_component:run()
-   for i = 1, #self.entities do
-      self.entities[i].Position = nil
+   local pool, entities = self.pool, self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
+      entity.Position = nil
+      pool:queue(entity)
    end
+   pool:flush()
 end
 
 local remove_components = class(EntityFactory)
 
 function remove_components:run()
-   for i = 1, #self.entities do
-      local entity = self.entities[i]
+   local pool = self.pool
+   local entities = self.entities
+   for i = 1, #entities do
+      local entity = entities[i]
       entity.Position = nil
       entity.Velocity = nil
       entity.Optional = nil
+      pool:queue(entity)
    end
+   pool:flush()
 end
 
 local system_update = class(NataBenchmark)

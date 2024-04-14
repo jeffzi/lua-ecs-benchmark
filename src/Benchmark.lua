@@ -40,19 +40,16 @@ function Benchmark:global_teardown() end
 ---@param measure_func function The measurement function to use.
 function Benchmark:_measure(measure_func)
    self:global_setup()
-   local stats = measure_func(
-      function()
-         self:run()
-      end,
-      nil,
-      nil,
-      function()
+   local stats = measure_func(function()
+      self:run()
+   end, {
+      setup = function()
          self:iteration_setup()
       end,
-      function()
+      teardown = function()
          self:iteration_teardown()
-      end
-   )
+      end,
+   })
    self:global_teardown()
    return stats
 end

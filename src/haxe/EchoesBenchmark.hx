@@ -168,7 +168,7 @@ class SystemUpdate extends HaxeBenchmark {
 				default:
 			}
 		}
-		new MovementSystem().activate();
+		Echoes.addSystem(new MovementSystem());
 	}
 
 	public function run():Void {

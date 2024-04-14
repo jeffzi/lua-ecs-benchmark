@@ -43,14 +43,6 @@ local HEADERS = {
    "rounds",
 }
 
---- @param num integer
---- @param precision integer
---- @return string
-local function format_number(num, precision)
-   local formatted, _ = string.format("%." .. precision .. "f", num):gsub("%.?0+$", "")
-   return formatted
-end
-
 --- Convert benchmark results to a table compatbile with pl.array2d.
 --- @param stats table
 --- @param extra table
@@ -66,9 +58,6 @@ local function to_array2d(stats, extra)
    for i = 1, #HEADERS do
       value = stats[HEADERS[i]]
       if value ~= nil then
-         if type(value) == "number" then
-            value = format_number(value, stats.precision)
-         end
          table.insert(array2d, value)
       end
    end

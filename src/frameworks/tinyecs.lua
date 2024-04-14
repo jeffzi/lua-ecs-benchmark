@@ -71,6 +71,7 @@ function EntityFactory:iteration_setup(empty)
       entity = tiny_addEntity(self.world, entity)
       table.insert(self.entities, entity)
    end
+   Benchmark.shuffle(self.entities)
 end
 
 local remove_entities = class(EntityFactory)

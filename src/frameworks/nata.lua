@@ -65,6 +65,7 @@ function EntityFactory:iteration_setup(empty)
 
       table.insert(self.entities, entity)
    end
+   Benchmark.shuffle(self.entities)
    self.pool:flush()
 end
 

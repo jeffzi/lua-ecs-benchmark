@@ -90,6 +90,7 @@ function EntityFactory:iteration_setup(empty)
       end
       table.insert(self.entities, entity)
    end
+   Benchmark.shuffle(self.entities)
 end
 
 local remove_entities = class(EntityFactory)

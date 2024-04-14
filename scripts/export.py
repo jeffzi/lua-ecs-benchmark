@@ -19,7 +19,7 @@ from rich.console import Console
 
 console = Console()
 
-METRIC = "mean"
+METRIC = "median"
 DEFAULT_TIME_UNIT = "s"
 DEFAULT_MEMORY_UNIT = "kb"
 

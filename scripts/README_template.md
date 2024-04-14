@@ -39,10 +39,8 @@ Libraries are automatically installed, provided the tools above are installed.
 
 ## Results
 
-Note:
-
 - `nata` is not displayed in plots and not tested for entities=100000 because of the very long execution time.
-- _lower is better_
+- The results are expressed in terms of **median** execution time and memory usage; _lower is better_.
 
 ### Benchmark environment
 

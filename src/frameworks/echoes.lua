@@ -37,7 +37,7 @@ dofile(haxe_path)
 local EchoesBenchmark = class(Benchmark)
 
 function EchoesBenchmark:iteration_teardown()
-   self.benchmark.iteration_teardown()
+   self.benchmark.teardown()
 end
 
 function EchoesBenchmark:run()
@@ -104,7 +104,7 @@ function system_update:global_setup()
 end
 
 function system_update:global_teardown()
-   self.benchmark.iteration_teardown()
+   self.benchmark.teardown()
 end
 
 function system_update:run()

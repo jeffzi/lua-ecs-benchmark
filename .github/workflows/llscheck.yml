@@ -9,6 +9,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: "**/requirements.txt"
+
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@master
@@ -17,15 +24,12 @@ jobs:
         run: brew install lua-language-server
 
       - name: Setup Lua
-        uses: leafo/gh-actions-lua@v10
-        with:
-          luaVersion: "5.1.5"
-
-      - name: Setup LuaRocks
-        uses: leafo/gh-actions-luarocks@v4
+        run: |-
+          pip install -r .github/workflows/requirements.txt
+          hererocks env --lua 5.1 --luarocks latest
 
       - name: Install dependencies
-        run: luarocks install llscheck
+        run: env/bin/luarocks install llscheck
 
       - name: Run llscheck
-        run: llscheck src
+        run: env/bin/llscheck src

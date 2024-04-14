@@ -83,32 +83,46 @@ local function main(output, frameworks, tests)
 
          for _, framework_name in pairs(frameworks) do
             i = i + 1
-            framework = FRAMEWORKS[framework_name]
-            benchmark_cls = framework[test_name]
 
-            printf(
-               "[%d/%d][%d entities][%s]: %s\n",
-               i,
-               total,
-               n_entities,
-               test_name,
-               benchmark_cls and framework_name
-                  or (framework_name .. "." .. test_name .. " not found, skipping")
-            )
+            if framework_name ~= "nata" or n_entities <= 1000 then
+               framework = FRAMEWORKS[framework_name]
+               benchmark_cls = framework[test_name]
 
-            if benchmark_cls then
-               extra["framework"] = framework_name
-               benchmark = benchmark_cls(n_entities)
+               printf(
+                  "[%d/%d][%d entities][%s]: %s\n",
+                  i,
+                  total,
+                  n_entities,
+                  test_name,
+                  benchmark_cls and framework_name
+                     or (framework_name .. "." .. test_name .. " not found, skipping")
+               )
 
-               collectgarbage("collect")
-               row = benchmark:timeit()
-               extra["unit"] = "s"
-               table.insert(stats, to_array2d(row, extra))
+               if benchmark_cls then
+                  extra["framework"] = framework_name
+                  benchmark = benchmark_cls(n_entities)
 
-               collectgarbage("collect")
-               row = benchmark:memit()
-               extra["unit"] = "kb"
-               table.insert(stats, to_array2d(row, extra))
+                  collectgarbage("collect")
+                  row = benchmark:timeit()
+                  extra["unit"] = "s"
+                  table.insert(stats, to_array2d(row, extra))
+
+                  collectgarbage("collect")
+                  row = benchmark:memit()
+                  extra["unit"] = "kb"
+                  table.insert(stats, to_array2d(row, extra))
+
+                  collectgarbage("collect")
+               end
+            else
+               printf(
+                  "[%d/%d][%d entities][%s]: %s\n",
+                  i,
+                  total,
+                  n_entities,
+                  test_name,
+                  "Skipping " .. framework_name .. " due to low performance."
+               )
             end
          end
       end

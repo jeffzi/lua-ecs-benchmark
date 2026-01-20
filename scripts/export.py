@@ -1,4 +1,5 @@
 import platform
+import subprocess
 import warnings
 from pathlib import Path
 from string import Template
@@ -7,15 +8,13 @@ from typing import Annotated
 import humanize
 import matplotlib.pyplot as plt
 import psutil
+import seaborn as sns
+import typer
+from rich.console import Console
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     import pandas as pd
-import subprocess
-
-import seaborn as sns
-import typer
-from rich.console import Console
 
 console = Console()
 
@@ -41,7 +40,7 @@ README_PATH = REPO_ROOT / "README.md"
 def _get_lua_version() -> str:
     try:
         result = subprocess.run(
-            ["lua", "-v"],  # noqa: S603, S607
+            ["lua", "-v"],  # noqa: S607
             capture_output=True,
             text=True,
             check=True,
@@ -65,7 +64,7 @@ def _get_specs() -> str:
     specs.append(f"Max Frequency: {psutil.cpu_freq().max:.2f}Mhz")
 
     mem = psutil.virtual_memory()
-    specs.append(f"Memory: {mem.total / (1024 ** 3):.2f}GB")
+    specs.append(f"Memory: {mem.total / (1024**3):.2f}GB")
 
     return "\n".join(specs)
 
@@ -73,13 +72,12 @@ def _get_specs() -> str:
 def _natural_duration(ns: float) -> str:
     for unit, factor in TIME_UNITS.items():
         if ns >= factor:
-            return f"{ ns / factor:.3g} {unit}"
+            return f"{ns / factor:.3g} {unit}"
     return f"{ns} ns"
 
 
 def _to_markdown_tables(df: pd.DataFrame) -> str:
-    # Convert METRIC to object type for compatibility with future pandas versions
-    # Setting an item of incompatible dtype will be deprecated
+    # pandas FutureWarning: Setting an item of incompatible dtype is deprecated
     df[METRIC] = df[METRIC].astype("object")
 
     df = df.pivot(  # noqa: PD010
@@ -136,9 +134,6 @@ def _to_markdown_tables(df: pd.DataFrame) -> str:
 
 def _export_plots(df: pd.DataFrame, out_dir: Path) -> list[Path]:
     df = df[df["framework"] != "nata"]
-    sns.color_palette("colorblind")
-
-    # Define a consistent color palette
     df = df.sort_values(by="framework")
     frameworks = df["framework"].unique()
     palette = sns.color_palette("colorblind", n_colors=len(frameworks))
@@ -217,18 +212,15 @@ def _main(
 
     md_path = out_dir / "results.md"
     table_md = _to_markdown_tables(df)
-    with open(md_path, "w") as file:
-        file.write(table_md)
+    md_path.write_text(table_md)
     console.print(f"Exported markdown tables to {md_path}.")
 
     plot_md = _plots_to_markdown(plot_paths)
-    with open(TEMPLATE_PATH) as file:
-        readme_template = Template(file.read())
+    readme_template = Template(TEMPLATE_PATH.read_text())
     readme = readme_template.substitute(
         benchmark_environment=_get_specs(), plots=plot_md, tables=table_md
     )
-    with open(README_PATH, "w") as file:
-        file.write(str(readme))
+    README_PATH.write_text(readme)
     console.print(f"Updated {README_PATH}.")
 
 

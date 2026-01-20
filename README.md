@@ -25,8 +25,7 @@ While these benchmarks offer valuable insights, it's important to understand tha
 Install:
 
 - [Lua 5.1+](https://www.lua.org/) (or [LuaJIT](https://luajit.org/)) & [Luarocks](https://luarocks.org)
-- [Haxe 4](https://haxe.org/): required to run echoes ECS.
-- [Python 3.10](https://www.python.org/) & [PDM](https://pdm-project.org): required to export the results.
+- [Python 3.12+](https://www.python.org/) & [uv](https://docs.astral.sh/uv/): required to export the results.
 - [Taskfile](https://taskfile.dev/): task runner
 
 Run benchmarks with:

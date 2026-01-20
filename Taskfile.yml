@@ -52,12 +52,12 @@ tasks:
 
   install-py-deps:
     internal: true
-    desc: Install lua and haxe dependencies.
+    desc: Install Python dependencies.
     cmds:
-      - pdm install --quiet
+      - uv sync --quiet
     preconditions:
-      - sh: pdm --version
-        msg: pdm not found in PATH.
+      - sh: uv --version
+        msg: "uv not found in PATH. See https://docs.astral.sh/uv/getting-started/installation/"
 
   export:
     desc: Export plots and markdown.
@@ -65,4 +65,4 @@ tasks:
       - install-py-deps
     cmds:
       - echo "Exporting Results"
-      - pdm run scripts/export.py {{.BENCHMARK_PATH}} {{.OUT_DIR}}
+      - uv run scripts/export.py {{.BENCHMARK_PATH}} {{.OUT_DIR}}

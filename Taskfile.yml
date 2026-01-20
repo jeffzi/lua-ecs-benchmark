@@ -9,14 +9,19 @@ vars:
 
 tasks:
   default:
+    internal: true
+    cmds:
+      - task: all
+
+  all:
     desc: Benchmark all frameworks and export the plots.
     cmds:
       - task: benchmark
       - task: export
 
-  init-subtrees:
+  init-submodules:
     internal: true
-    desc: Init git subtrees, required for some dependencies.
+    desc: Init git submodules for framework dependencies.
     cmds:
       - git submodule update --init
 
@@ -28,7 +33,6 @@ tasks:
       - luarocks list --porcelain chronos | grep -q "installed" || luarocks install chronos
       - luarocks list --porcelain lovetoys | grep -q "installed" || luarocks install lovetoys
       - luarocks list --porcelain luamark | grep -q "installed" || luarocks install luamark
-      - luarocks list --porcelain penlight | grep -q "installed" || luarocks install penlight
       - luarocks list --porcelain tiny-ecs | grep -q "installed" || luarocks install tiny-ecs
     preconditions:
       - sh: luarocks --version
@@ -37,11 +41,11 @@ tasks:
   benchmark:
     desc: Benchmark all frameworks.
     deps:
-      - init-subtrees
+      - init-submodules
       - install-deps
     cmds:
       - echo "Running Benchmarks"
-      - lua src/main.lua -o "{{.BENCHMARK_PATH}}"
+      - lua src/main.lua -o "{{.BENCHMARK_PATH}}" {{.CLI_ARGS}}
 
   install-py-deps:
     internal: true
@@ -59,3 +63,22 @@ tasks:
     cmds:
       - echo "Exporting Results"
       - uv run scripts/export.py {{.BENCHMARK_PATH}} {{.OUT_DIR}}
+
+  update-submodules:
+    desc: Update submodules to latest commits and refresh README.
+    cmds:
+      - git submodule update --init --remote
+      - git add lib/
+      - |
+        echo ""
+        echo "Update README.md with:"
+        echo ""
+        echo "| Library | Commit |"
+        echo "|---------|--------|"
+        for dir in lib/*/; do
+          name=$(basename "$dir")
+          sha=$(git -C "$dir" rev-parse HEAD)
+          short=$(git -C "$dir" rev-parse --short HEAD)
+          url=$(git config --file .gitmodules --get "submodule.${dir%/}.url" | sed 's/\.git$//')
+          echo "| [$name]($url) | [\`$short\`]($url/tree/$sha) |"
+        done

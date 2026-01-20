@@ -7,7 +7,6 @@ local path = require("pl.path")
 local FRAMEWORKS = {
    ["ecs-lua"] = require("src.frameworks.ecs-lua"),
    concord = require("src.frameworks.concord"),
-   echoes = require("src.frameworks.echoes"),
    lovetoys = require("src.frameworks.lovetoys"),
    nata = require("src.frameworks.nata"),
    tinyecs = require("src.frameworks.tinyecs"),

@@ -10,7 +10,6 @@ This repository hosts a benchmark suite for popular Lua ECS (Entity-Component-Sy
 - **[concord](https://github.com/Keyslam-Group/Concord)**: A feature-complete ECS for LÖVE.
 - **[ecs-lua](https://github.com/nidorx/ecs-lua)**: A full-featured ECS library for Lua.
 - **[nata](https://github.com/tesselode/nata)**: Entity management for Lua.
-- **[echoes](https://github.com/player-03/echoes)**: A macro-based ECS framework, focusing on ease of use, written in Haxe and transpiled to Lua.
 
 ## Benchmark Tests
 

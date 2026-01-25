@@ -1,158 +1,88 @@
 ---@diagnostic disable: unused-local
-local Benchmark = require("src.Benchmark")
-local class = require("pl.class")
 local lovetoys = require("lovetoys")
+local shuffle = require("src.utils").shuffle
 
 lovetoys.initialize()
-local Engine, Entity, Component, System =
-   lovetoys.Engine, lovetoys.Entity, lovetoys.Component, lovetoys.System
+local lt_class = lovetoys.class
+local lt_Component = lovetoys.Component
+local lt_Engine = lovetoys.Engine
+local lt_Entity = lovetoys.Entity
+local lt_System = lovetoys.System
 
-local Position = Component.create("Position", { "x", "y" }, { x = 0, y = 0 })
-local Velocity = Component.create("Velocity", { "x", "y" }, { x = 0, y = 0 })
-local Optional = Component.create("Optional")
-local Padding1 = Component.create("Padding1")
-local Padding2 = Component.create("Padding2")
-local Padding3 = Component.create("Padding3")
+-- ----------------------------------------------------------------------------
+-- Setup
+-- ----------------------------------------------------------------------------
 
-local LovetoysBenchmark = class(Benchmark)
+local Position = lt_Component.create("Position", { "x", "y" }, { x = 0, y = 0 })
+local Velocity = lt_Component.create("Velocity", { "x", "y" }, { x = 0, y = 0 })
+local Optional = lt_Component.create("Optional")
+local Padding1 = lt_Component.create("Padding1")
+local Padding2 = lt_Component.create("Padding2")
+local Padding3 = lt_Component.create("Padding3")
 
-function LovetoysBenchmark:iteration_setup()
-   self.engine = Engine()
+--- Create a new engine.
+--- @return { engine: table } Context with engine.
+local function create_engine()
+   return { engine = lt_Engine() }
 end
-function LovetoysBenchmark:iteration_teardown()
-   self.engine = nil
+
+--- Create an engine populated with entities (with components).
+--- @param _ctx table Unused previous context.
+--- @param p { n_entities: number } Benchmark parameters.
+--- @return { engine: table, entities: table[] } Context with engine and entities.
+local function create_populated_engine(_ctx, p)
+   local engine = lt_Engine()
+   local entities = {}
+   for i = 1, p.n_entities do
+      local entity = lt_Entity()
+      entity:initialize()
+      entity:add(Position(0, 0))
+      entity:add(Velocity(0, 0))
+      entity:add(Optional())
+      engine:addEntity(entity)
+      entities[i] = entity
+   end
+   shuffle(entities)
+   return { engine = engine, entities = entities }
 end
 
-local add_empty_entity = class(LovetoysBenchmark)
-function add_empty_entity:run()
-   local engine = self.engine
-   for _ = 1, self.n_entities do
-      local entity = Entity()
+--- Create an engine populated with empty entities.
+--- @param _ctx table Unused previous context.
+--- @param p { n_entities: number } Benchmark parameters.
+--- @return { engine: table, entities: table[] } Context with engine and entities.
+local function create_empty_entities(_ctx, p)
+   local engine = lt_Engine()
+   local entities = {}
+   for i = 1, p.n_entities do
+      local entity = lt_Entity()
       entity:initialize()
       engine:addEntity(entity)
+      entities[i] = entity
    end
+   shuffle(entities)
+   return { engine = engine, entities = entities }
 end
 
-local add_entities = class.add_entities(LovetoysBenchmark)
+--- Clear the engine (no-op, just nil out for GC).
+--- @param ctx { engine: table } Context with engine.
+local function clear_engine(ctx)
+   ctx.engine = nil
+end
 
-function add_entities:run()
-   local engine = self.engine
-   for _ = 1, self.n_entities do
-      local entity = Entity()
+--- Create system_update before function.
+--- @param _ctx table Unused previous context.
+--- @param p { n_entities: number } Benchmark parameters.
+--- @return { engine: table } Context with engine.
+local function create_system_engine(_ctx, p)
+   local engine = lt_Engine()
+   for i = 1, p.n_entities do
+      local entity = lt_Entity()
       entity:initialize()
       entity:add(Position(0, 0))
       entity:add(Velocity(0, 0))
       engine:addEntity(entity)
-   end
-end
 
-local EntityFactory = class(LovetoysBenchmark)
-
-function EntityFactory:iteration_setup(empty)
-   self.engine = Engine()
-   self.entities = {}
-   local entity
-   for _ = 1, self.n_entities do
-      entity = Entity()
-      if not empty then
-         entity:add(Position(0, 0))
-         entity:add(Velocity(0, 0))
-         entity:add(Optional())
-      end
-      table.insert(self.entities, entity)
-   end
-   Benchmark.shuffle(self.entities)
-end
-
-local remove_entities = class(EntityFactory)
-
-function remove_entities:run()
-   local engine, entities = self.engine, self.entities
-   for i = 1, #entities do
-      engine:removeEntity(entities[i])
-   end
-end
-
-local get_component = class(EntityFactory)
-
-function get_component:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      --luacheck: ignore
-      local component = entities[i]:get("Position")
-   end
-end
-
-local get_components = class(EntityFactory)
-
-function get_components:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      local entity = entities[i]
-      --luacheck: ignore
-      local component = entity:get("Position")
-      component = entity:get("Velocity")
-      component = entity:get("Optional")
-   end
-end
-
-local add_component = class(EntityFactory)
-
-function add_component:iteration_setup()
-   EntityFactory.iteration_setup(self, true)
-end
-
-function add_component:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      entities[i]:add(Position(0, 0))
-   end
-end
-
-local add_components = class(add_component)
-
-function add_components:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      local entity = entities[i]
-      entity:addMultiple({ Position(0, 0), Velocity(0, 0), Optional() })
-   end
-end
-
-local remove_component = class(EntityFactory)
-
-function remove_component:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      entities[i]:remove("Position")
-   end
-end
-
-local remove_components = class(EntityFactory)
-
-function remove_components:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      local entity = entities[i]
-      entity:remove("Position")
-      entity:remove("Velocity")
-      entity:remove("Optional")
-   end
-end
-
-local system_update = class(Benchmark)
-
-function system_update:global_setup()
-   self.engine = Engine()
-   local entity, padding, shuffle
-   for i = 1, self.n_entities do
-      entity = Entity()
-      entity:initialize()
-      entity:add(Position(0, 0))
-      entity:add(Velocity(0, 0))
-      self.engine:addEntity(entity)
-
-      padding = i % 4
+      local padding = i % 4
       if padding == 1 then
          entity:add(Padding1())
       elseif padding == 2 then
@@ -161,50 +91,192 @@ function system_update:global_setup()
          entity:add(Padding3())
       end
 
-      shuffle = (i + 1) % 4
-      if shuffle == 0 then
+      local should_shuffle = (i + 1) % 4
+      if should_shuffle == 0 then
          entity:remove("Position")
-      elseif shuffle == 1 then
+      elseif should_shuffle == 1 then
          entity:remove("Velocity")
       end
    end
 
-   local MovementSystem = lovetoys.class("MovementSystem", System)
+   local MovementSystem = lt_class("MovementSystem", lt_System)
 
    function MovementSystem:requires()
       return { "Position", "Velocity" }
    end
 
    function MovementSystem:update(dt)
-      local position, velocity
       for _, e in pairs(self.targets) do
-         position = e:get("Position")
-         velocity = e:get("Velocity")
+         local position = e:get("Position")
+         local velocity = e:get("Velocity")
          position.x = position.x + velocity.x * dt
          position.y = position.y + velocity.y * dt
       end
    end
 
-   self.engine:addSystem(MovementSystem())
+   engine:addSystem(MovementSystem())
+   return { engine = engine }
 end
 
-function system_update:global_teardown()
-   self.engine = nil
-end
+-- ----------------------------------------------------------------------------
+-- Default Tests
+-- ----------------------------------------------------------------------------
 
-function system_update:run()
-   self.engine:update(1 / 60)
-end
+local default = {
+   add_empty_entity = {
+      fn = function(ctx, p)
+         local engine = ctx.engine
+         for _ = 1, p.n_entities do
+            local entity = lt_Entity()
+            entity:initialize()
+            engine:addEntity(entity)
+         end
+      end,
+      before = create_engine,
+      after = clear_engine,
+   },
+
+   add_entities = {
+      fn = function(ctx, p)
+         local engine = ctx.engine
+         for _ = 1, p.n_entities do
+            local entity = lt_Entity()
+            entity:initialize()
+            entity:add(Position(0, 0))
+            entity:add(Velocity(0, 0))
+            engine:addEntity(entity)
+         end
+      end,
+      before = create_engine,
+      after = clear_engine,
+   },
+
+   remove_entities = {
+      fn = function(ctx, _p)
+         local engine, entities = ctx.engine, ctx.entities
+         for i = 1, #entities do
+            engine:removeEntity(entities[i])
+         end
+      end,
+      before = create_populated_engine,
+      after = clear_engine,
+   },
+
+   get_component = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local _ = entities[i]:get("Position")
+         end
+      end,
+      before = create_populated_engine,
+      after = clear_engine,
+   },
+
+   get_components = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local entity = entities[i]
+            local _ = entity:get("Position")
+            _ = entity:get("Velocity")
+            _ = entity:get("Optional")
+         end
+      end,
+      before = create_populated_engine,
+      after = clear_engine,
+   },
+
+   add_component = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            entities[i]:add(Position(0, 0))
+         end
+      end,
+      before = create_empty_entities,
+      after = clear_engine,
+   },
+
+   remove_component = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            entities[i]:remove("Position")
+         end
+      end,
+      before = create_populated_engine,
+      after = clear_engine,
+   },
+
+   remove_components = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local entity = entities[i]
+            entity:remove("Position")
+            entity:remove("Velocity")
+            entity:remove("Optional")
+         end
+      end,
+      before = create_populated_engine,
+      after = clear_engine,
+   },
+
+   system_update = {
+      fn = function(ctx, _p)
+         ctx.engine:update(1 / 60)
+      end,
+      before = create_system_engine,
+      after = clear_engine,
+   },
+}
+
+-- ----------------------------------------------------------------------------
+-- Non-batch Tests
+-- ----------------------------------------------------------------------------
+
+local nobatch = {
+   add_components = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local e = entities[i]
+            e:add(Position(0, 0))
+            e:add(Velocity(0, 0))
+            e:add(Optional())
+         end
+      end,
+      before = create_empty_entities,
+      after = clear_engine,
+   },
+}
+
+-- ----------------------------------------------------------------------------
+-- Batch Tests
+-- ----------------------------------------------------------------------------
+
+local batch = {
+   add_components = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            entities[i]:addMultiple({ Position(0, 0), Velocity(0, 0), Optional() })
+         end
+      end,
+      before = create_empty_entities,
+      after = clear_engine,
+   },
+}
+
+-- ----------------------------------------------------------------------------
+-- Module Export
+-- ----------------------------------------------------------------------------
 
 return {
-   add_empty_entity = add_empty_entity,
-   add_entities = add_entities,
-   remove_entities = remove_entities,
-   get_component = get_component,
-   get_components = get_components,
-   add_component = add_component,
-   add_components = add_components,
-   remove_component = remove_component,
-   remove_components = remove_components,
-   system_update = system_update,
+   variants = {
+      ["lovetoys-default"] = default,
+      ["lovetoys-nobatch"] = nobatch,
+      ["lovetoys-batch"] = batch,
+   },
 }

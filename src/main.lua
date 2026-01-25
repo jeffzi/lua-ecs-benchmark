@@ -1,17 +1,36 @@
 local argparse = require("argparse")
-local tablex = require("pl.tablex")
-local printf = require("pl.utils").printf
-local data = require("pl.data")
-local path = require("pl.path")
+local luamark = require("luamark")
+local utils = require("src.utils")
 
-local FRAMEWORKS = {
+--- Framework modules. Some export tests directly, others export variants.
+local MODULES = {
    ["ecs-lua"] = require("src.frameworks.ecs-lua"),
    concord = require("src.frameworks.concord"),
    lovetoys = require("src.frameworks.lovetoys"),
    nata = require("src.frameworks.nata"),
    tinyecs = require("src.frameworks.tinyecs"),
 }
-local FRAMEWORK_NAMES = tablex.keys(FRAMEWORKS)
+
+--- Flattened framework name -> tests mapping (variants expanded).
+local FRAMEWORKS = {}
+
+--- Alias name -> variant names (e.g., "ecs-lua" -> {"ecs-lua-batch", "ecs-lua-nobatch"}).
+local FRAMEWORK_ALIASES = {}
+
+for name, mod in pairs(MODULES) do
+   if mod.variants then
+      FRAMEWORK_ALIASES[name] = {}
+      for variant_name, tests in pairs(mod.variants) do
+         FRAMEWORKS[variant_name] = tests
+         FRAMEWORK_ALIASES[name][#FRAMEWORK_ALIASES[name] + 1] = variant_name
+      end
+   else
+      FRAMEWORKS[name] = mod
+   end
+end
+
+local FRAMEWORK_NAMES = utils.keys(FRAMEWORKS)
+local CLI_FRAMEWORK_CHOICES = utils.concat(FRAMEWORK_NAMES, utils.keys(FRAMEWORK_ALIASES))
 
 local TESTS = {
    "add_empty_entity",
@@ -26,7 +45,7 @@ local TESTS = {
    "system_update",
 }
 
-local entities = { 10, 100, 1000, 10000, 100000 }
+local ENTITY_COUNTS = { 10, 100, 1000, 10000, 100000 }
 
 local HEADERS = {
    "entities",
@@ -35,127 +54,133 @@ local HEADERS = {
    "unit",
    "timestamp",
    "median",
-   "mean",
-   "stddev",
-   "min",
-   "max",
+   "ci_lower",
+   "ci_upper",
    "rounds",
 }
 
---- Convert benchmark results to a table compatbile with pl.array2d.
---- @param stats table
---- @param extra table
---- @return table
-local function to_array2d(stats, extra)
-   local array2d = {}
+--- Run time and memory benchmarks for a set of specs, logging progress.
+--- @param specs table<string, table> Framework specs to benchmark.
+--- @param counts number[] Entity counts to benchmark.
+--- @param test_name string Name of the test.
+--- @param all_stats table[] Accumulator for results.
+--- @param max_entities? number Optional max_entities limit for logging.
+local function run_benchmarks(specs, counts, test_name, all_stats, max_entities)
+   local names = utils.keys(specs)
+   table.sort(names)
 
-   for key, value in pairs(extra) do
-      stats[key] = value
-   end
+   local limit_info = max_entities and string.format(" (max_entities=%d)", max_entities) or ""
+   utils.printf(
+      "[%s] Running %d frameworks%s: %s\n",
+      test_name,
+      #names,
+      limit_info,
+      table.concat(names, ", ")
+   )
 
-   local value
-   for i = 1, #HEADERS do
-      value = stats[HEADERS[i]]
-      if value ~= nil then
-         table.insert(array2d, value)
+   local params = { params = { n_entities = counts } }
+
+   for _, benchmark_fn in ipairs({ luamark.compare_time, luamark.compare_memory }) do
+      collectgarbage("collect")
+      for _, result in ipairs(benchmark_fn(specs, params)) do
+         all_stats[#all_stats + 1] = {
+            result.n_entities,
+            test_name,
+            result.name,
+            result.unit,
+            result.timestamp,
+            result.median,
+            result.ci_lower,
+            result.ci_upper,
+            result.rounds,
+         }
       end
    end
-   return array2d
 end
 
---- @param output? string
---- @param frameworks? string[]
---- @param tests? string[]
-local function main(output, frameworks, tests)
-   frameworks = frameworks or FRAMEWORK_NAMES
+--- Filter entity counts to those at or below a limit.
+--- @param counts number[] Entity counts.
+--- @param limit number Maximum allowed count.
+--- @return number[] Filtered counts.
+local function filter_counts(counts, limit)
+   local filtered = {}
+   for _, n in ipairs(counts) do
+      if n <= limit then
+         filtered[#filtered + 1] = n
+      end
+   end
+   return filtered
+end
+
+--- Run benchmarks.
+--- @param output? string Output CSV file path.
+--- @param framework_names? string[] Framework names to benchmark.
+--- @param tests? string[] Test names to run.
+--- @param entity_counts? number[] Entity counts to benchmark.
+local function main(output, framework_names, tests, entity_counts)
+   framework_names = framework_names or FRAMEWORK_NAMES
    tests = tests or TESTS
+   entity_counts = entity_counts or ENTITY_COUNTS
 
-   local stats = {}
-   local total = tablex.size(frameworks) * tablex.size(tests) * tablex.size(entities)
-   local i = 0
-   local framework, benchmark_cls, benchmark, row, extra
-   for _, n_entities in pairs(entities) do
-      extra = { entities = n_entities }
+   local all_stats = {}
+   local max_count = entity_counts[#entity_counts]
 
-      for _, test_name in pairs(tests) do
-         extra["test"] = test_name
+   for _, test_name in ipairs(tests) do
+      -- Group frameworks by max_entities limit
+      local groups = {} -- limit -> { name = spec, ... }
 
-         for _, framework_name in pairs(frameworks) do
-            i = i + 1
+      for _, name in ipairs(framework_names) do
+         local spec = FRAMEWORKS[name] and FRAMEWORKS[name][test_name]
+         if spec then
+            local limit = spec.max_entities
+            if not limit or limit >= max_count then
+               limit = "unlimited"
+            end
+            groups[limit] = groups[limit] or {}
+            groups[limit][name] = spec
+         end
+      end
 
-            if framework_name ~= "nata" or n_entities <= 1000 then
-               framework = FRAMEWORKS[framework_name]
-               benchmark_cls = framework[test_name]
-
-               printf(
-                  "[%d/%d][%d entities][%s]: %s\n",
-                  i,
-                  total,
-                  n_entities,
-                  test_name,
-                  benchmark_cls and framework_name
-                     or (framework_name .. "." .. test_name .. " not found, skipping")
-               )
-
-               if benchmark_cls then
-                  extra["framework"] = framework_name
-                  benchmark = benchmark_cls(n_entities)
-
-                  collectgarbage("collect")
-                  row = benchmark:timeit()
-                  extra["unit"] = "s"
-                  table.insert(stats, to_array2d(row, extra))
-
-                  collectgarbage("collect")
-                  row = benchmark:memit()
-                  extra["unit"] = "kb"
-                  table.insert(stats, to_array2d(row, extra))
-
-                  collectgarbage("collect")
-               end
-            else
-               printf(
-                  "[%d/%d][%d entities][%s]: %s\n",
-                  i,
-                  total,
-                  n_entities,
-                  test_name,
-                  "Skipping " .. framework_name .. " due to low performance."
-               )
+      -- Run each group with appropriate entity counts
+      for limit, specs in pairs(groups) do
+         if limit == "unlimited" then
+            run_benchmarks(specs, entity_counts, test_name, all_stats, nil)
+         else
+            local counts = filter_counts(entity_counts, limit)
+            if #counts > 0 then
+               run_benchmarks(specs, counts, test_name, all_stats, limit)
             end
          end
       end
    end
 
    if output then
-      data.write(stats, output, HEADERS, ",")
+      utils.write_csv(all_stats, output, HEADERS, ",")
       print("\nWrote results to " .. output)
    end
-end
-
---- Ensure that base directory exists and convert it to absolute path.
---- @param filepath string
---- @return string
-local function mkdir(filepath)
-   local dir = path.dirname(filepath)
-   if not path.exists(dir) then
-      path.mkdir(dir)
-   end
-   return filepath
 end
 
 local function cli()
    local desc = "Benchmark ECS (Entity-Component-System)-Frameworks in Lua"
    local parser = argparse("lua-ecs-benchmark", desc)
-   parser:option("-o --output", "CSV file where the results will be saved."):convert(mkdir)
+   parser:option("-o --output", "CSV file where the results will be saved."):convert(utils.mkdir)
    parser
       :option("--framework", "ECS frameworks to benchmark")
-      :choices(FRAMEWORK_NAMES)
-      :default(FRAMEWORK_NAMES)
+      :choices(CLI_FRAMEWORK_CHOICES)
+      :default(CLI_FRAMEWORK_CHOICES)
+      :args("+")
+   parser:option("--test", "Tests to run"):choices(TESTS):default(TESTS):args("+")
+   parser
+      :option("-n --entities", "Entity counts to benchmark")
+      :convert(tonumber)
+      :default(ENTITY_COUNTS)
       :args("+")
    local args = parser:parse()
 
-   main(args.output, args.framework)
+   -- Expand aliases (e.g., "ecs-lua" -> {"ecs-lua-batch", "ecs-lua-nobatch"})
+   local frameworks = utils.expand_names(args.framework, FRAMEWORK_ALIASES)
+
+   main(args.output, frameworks, args.test, args.entities)
 end
 
 cli()

@@ -1,202 +1,92 @@
+--[[
+   ECS-Lua uses a deferred entity lifecycle model:
+   - Entities created with world:Entity() have isAlive=false and are NOT in the repository
+   - world:Update() activates entities (isAlive=true) and inserts them into the repository
+   - Component changes on alive entities update the repository immediately (no Update needed)
+   - Lifecycle events (OnEnter/OnExit) are deferred to Update(), but this is an optimization -
+     structural work happens immediately
+
+   We call Update() in before functions to make entities alive. We do NOT call Update()
+   in component modification fn functions because ECS-Lua's optimization is that structural
+   changes (archetype moves, query visibility) happen immediately.
+--]]
+
 ---@diagnostic disable: unused-local
-local Benchmark = require("src.Benchmark")
 local ECS = require("lib.ecs-lua.ECS")
-local class = require("pl.class")
+local shuffle = require("src.utils").shuffle
 
-local Component, System, Query = ECS.Component, ECS.System, ECS.Query
+local ecs_Component = ECS.Component
+local ecs_System = ECS.System
+local ecs_Query = ECS.Query
+local ecs_World = ECS.World
 
-local Position = Component({
-   x = 0.0,
-   y = 0.0,
-})
+-- ----------------------------------------------------------------------------
+-- Setup
+-- ----------------------------------------------------------------------------
 
-local Velocity = Component({
-   x = 0.0,
-   y = 0.0,
-})
+local Position = ecs_Component({ x = 0.0, y = 0.0 })
+local Velocity = ecs_Component({ x = 0.0, y = 0.0 })
+local Optional = ecs_Component()
+local Padding1 = ecs_Component()
+local Padding2 = ecs_Component()
+local Padding3 = ecs_Component()
 
-local Optional = Component()
-local Padding1 = Component()
-local Padding2 = Component()
-local Padding3 = Component()
+local DT = 1000 / 60 / 1000
 
-local ECSBenchmark = class(Benchmark)
-
-function ECSBenchmark:iteration_setup()
-   self.world = ECS.World(nil, 60, false)
-   self.timestep = 1
-   self.dt = 1000 / 60 / 1000
+--- Create a new ECS world with timing info.
+--- @return { world: table, timestep: number, dt: number } Context with world and timing.
+local function create_world()
+   return { world = ecs_World(nil, 60, false), timestep = 1, dt = DT }
 end
 
-function ECSBenchmark:iteration_teardown()
-   self.world:Destroy()
-   self.world = nil
-end
-
-local add_empty_entity = class(ECSBenchmark)
-
-function add_empty_entity:run()
-   local world, timestep = self.world, self.timestep + 1
-   for _ = 1, self.n_entities do
-      world:Entity()
+--- Create a world populated with entities (with components).
+--- @param _ctx table Unused previous context.
+--- @param p { n_entities: number } Benchmark parameters.
+--- @return { world: table, entities: table[], timestep: number, dt: number } Context.
+local function create_populated_world(_ctx, p)
+   local world = ecs_World(nil, 60, false)
+   local entities = {}
+   for i = 1, p.n_entities do
+      entities[i] =
+         world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }), Optional())
    end
-   world:Update("process", timestep * self.dt)
-   self.timestep = timestep
+   world:Update("process", DT) -- Make entities alive
+   shuffle(entities)
+   return { world = world, entities = entities, timestep = 1, dt = DT }
 end
 
-local add_entities = class.add_entities(ECSBenchmark)
-
-function add_entities:run()
-   local world, timestep = self.world, self.timestep + 1
-   for _ = 1, self.n_entities do
-      world:Entity(
-         Position({
-            x = 0.0,
-            y = 0.0,
-         }),
-         Velocity({
-            x = 0.0,
-            y = 0.0,
-         })
-      )
+--- Create a world populated with empty entities.
+--- @param _ctx table Unused previous context.
+--- @param p { n_entities: number } Benchmark parameters.
+--- @return { world: table, entities: table[], timestep: number, dt: number } Context.
+local function create_empty_entities(_ctx, p)
+   local world = ecs_World(nil, 60, false)
+   local entities = {}
+   for i = 1, p.n_entities do
+      entities[i] = world:Entity()
    end
-   world:Update("process", timestep * self.dt)
-   self.timestep = timestep
+   world:Update("process", DT) -- Make entities alive
+   shuffle(entities)
+   return { world = world, entities = entities, timestep = 1, dt = DT }
 end
 
-local EntityFactory = class(ECSBenchmark)
-
-function EntityFactory:iteration_setup(empty)
-   self.world = ECS.World(nil, 60, false)
-   self.timestep = 1
-   self.dt = 1000 / 60 / 1000
-
-   self.entities = {}
-   local entity
-   for _ = 1, self.n_entities do
-      if empty then
-         entity = self.world:Entity()
-      else
-         entity = self.world:Entity(
-            Position({
-               x = 0.0,
-               y = 0.0,
-            }),
-            Velocity({
-               x = 0.0,
-               y = 0.0,
-            }, Optional())
-         )
-      end
-      table.insert(self.entities, entity)
-   end
-   Benchmark.shuffle(self.entities)
+--- Destroy the world.
+--- @param ctx { world: table } Context with world.
+local function destroy_world(ctx)
+   ctx.world:Destroy()
 end
 
-local remove_entities = class(EntityFactory)
+--- Create system_update before function.
+--- @param _ctx table Unused previous context.
+--- @param p { n_entities: number } Benchmark parameters.
+--- @return { world: table, timestep: number, dt: number } Context.
+local function create_system_world(_ctx, p)
+   local world = ecs_World(nil, 60, false)
 
-function remove_entities:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      self.world:Remove(entities[i])
-   end
-   self.world:Update("process", self.timestep * self.dt)
-end
+   for i = 1, p.n_entities do
+      local entity = world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }))
 
-local get_component = class(EntityFactory)
-
-function get_component:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      --luacheck: ignore
-      local component = entities[i][Position]
-   end
-end
-
-local get_components = class(EntityFactory)
-
-function get_components:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      local entity = entities[i]
-      --luacheck: ignore
-      local components = entity:Get(Position, Velocity, Position)
-   end
-end
-
-local add_component = class(EntityFactory)
-
-function add_component:iteration_setup()
-   EntityFactory.iteration_setup(self, true)
-end
-
-function add_component:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      entities[i].Position = Position({
-         x = 0.0,
-         y = 0.0,
-      })
-   end
-end
-
-local add_components = class(add_component)
-
-function add_components:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      entities[i]:Set(
-         Position({
-            x = 0.0,
-            y = 0.0,
-         }),
-         Velocity({
-            x = 0.0,
-            y = 0.0,
-         }),
-         Optional()
-      )
-   end
-end
-
-local remove_component = class(EntityFactory)
-
-function remove_component:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      -- = nil doesn't work
-      entities[i]:Unset(Position)
-   end
-end
-
-local remove_components = class(EntityFactory)
-
-function remove_components:run()
-   local entities = self.entities
-   for i = 1, #entities do
-      entities[i]:Unset(Position, Velocity, Optional)
-   end
-end
-
-local system_update = class(Benchmark)
-function system_update:global_setup()
-   self.world = ECS.World(nil, 60, false)
-   self.timestep = 1
-   self.dt = 1000 / 60 / 1000
-
-   local entity, padding, shuffle
-   for i = 1, self.n_entities do
-      entity = self.world:Entity(
-         Position({
-            x = 0.0,
-            y = 0.0,
-         }),
-         Velocity({
-            x = 0.0,
-            y = 0.0,
-         })
-      )
-      padding = i % 4
+      local padding = i % 4
       if padding == 1 then
          entity.Padding1 = Padding1()
       elseif padding == 2 then
@@ -205,49 +95,238 @@ function system_update:global_setup()
          entity.Padding3 = Padding3()
       end
 
-      shuffle = (i + 1) % 4
-      if shuffle == 0 then
+      local should_shuffle = (i + 1) % 4
+      if should_shuffle == 0 then
          entity:Unset(Position)
-      elseif shuffle == 1 then
+      elseif should_shuffle == 1 then
          entity:Unset(Velocity)
       end
    end
 
    ---@diagnostic disable-next-line: redefined-local
-   local MovementSystem = System("process", 1, Query.All(Position, Velocity), function(self, Time)
-      local dt = Time.DeltaFixed
+   local MovementSystem = ecs_System(
+      "process",
+      1,
+      ecs_Query.All(Position, Velocity),
+      function(self, Time)
+         local dt = Time.DeltaFixed
+         self:Result():ForEach(function(e)
+            local position = e[Position]
+            local velocity = e[Velocity]
+            position.x = position.x + velocity.x * dt
+            position.y = position.y + velocity.y * dt
+         end)
+      end
+   )
 
-      self:Result():ForEach(function(e)
-         local position = e[Position]
-         local velocity = e[Velocity]
-         position.x = position.y + velocity.x * dt
-         position.y = position.y + velocity.y * dt
-      end)
-   end)
-
-   self.world:AddSystem(MovementSystem)
+   world:AddSystem(MovementSystem)
+   return { world = world, timestep = 1, dt = DT }
 end
 
-function system_update:global_teardown()
-   self.world:Destroy()
-   self.world = nil
-end
+-- ----------------------------------------------------------------------------
+-- Default Tests
+-- ----------------------------------------------------------------------------
 
-function system_update:run()
-   local timestep = self.timestep + 1
-   self.world:Update("process", timestep * self.dt)
-   self.timestep = timestep
-end
+local default = {
+   add_empty_entity = {
+      fn = function(ctx, p)
+         local world = ctx.world
+         local timestep = ctx.timestep + 1
+         for _ = 1, p.n_entities do
+            world:Entity()
+         end
+         world:Update("process", timestep * ctx.dt)
+         ctx.timestep = timestep
+      end,
+      before = create_world,
+      after = destroy_world,
+   },
+
+   remove_entities = {
+      fn = function(ctx, _p)
+         local world, entities = ctx.world, ctx.entities
+         for i = 1, #entities do
+            world:Remove(entities[i])
+         end
+         world:Update("process", ctx.timestep * ctx.dt)
+      end,
+      before = create_populated_world,
+      after = destroy_world,
+   },
+
+   get_component = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local _ = entities[i][Position]
+         end
+      end,
+      before = create_populated_world,
+      after = destroy_world,
+   },
+
+   add_component = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            entities[i][Position] = Position({ x = 0.0, y = 0.0 })
+         end
+      end,
+      before = create_empty_entities,
+      after = destroy_world,
+   },
+
+   remove_component = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            entities[i]:Unset(Position)
+         end
+      end,
+      before = create_populated_world,
+      after = destroy_world,
+   },
+
+   system_update = {
+      fn = function(ctx, _p)
+         local timestep = ctx.timestep + 1
+         ctx.world:Update("process", timestep * ctx.dt)
+         ctx.timestep = timestep
+      end,
+      before = create_system_world,
+      after = destroy_world,
+   },
+}
+
+-- ----------------------------------------------------------------------------
+-- Non-batch Tests
+-- ----------------------------------------------------------------------------
+
+local nobatch = {
+   add_entities = {
+      fn = function(ctx, p)
+         local world = ctx.world
+         local timestep = ctx.timestep + 1
+         for _ = 1, p.n_entities do
+            local e = world:Entity()
+            e[Position] = Position({ x = 0.0, y = 0.0 })
+            e[Velocity] = Velocity({ x = 0.0, y = 0.0 })
+         end
+         world:Update("process", timestep * ctx.dt)
+         ctx.timestep = timestep
+      end,
+      before = create_world,
+      after = destroy_world,
+   },
+
+   add_components = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local e = entities[i]
+            e[Position] = Position({ x = 0.0, y = 0.0 })
+            e[Velocity] = Velocity({ x = 0.0, y = 0.0 })
+            e[Optional] = Optional()
+         end
+      end,
+      before = create_empty_entities,
+      after = destroy_world,
+   },
+
+   get_components = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local e = entities[i]
+            local _ = e[Position]
+            _ = e[Velocity]
+            _ = e[Optional]
+         end
+      end,
+      before = create_populated_world,
+      after = destroy_world,
+   },
+
+   remove_components = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local e = entities[i]
+            e:Unset(Position)
+            e:Unset(Velocity)
+            e:Unset(Optional)
+         end
+      end,
+      before = create_populated_world,
+      after = destroy_world,
+   },
+}
+
+-- ----------------------------------------------------------------------------
+-- Batch Tests
+-- ----------------------------------------------------------------------------
+
+local batch = {
+   add_entities = {
+      fn = function(ctx, p)
+         local world = ctx.world
+         local timestep = ctx.timestep + 1
+         for _ = 1, p.n_entities do
+            world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }))
+         end
+         world:Update("process", timestep * ctx.dt)
+         ctx.timestep = timestep
+      end,
+      before = create_world,
+      after = destroy_world,
+   },
+
+   add_components = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            entities[i]:Set(
+               Position({ x = 0.0, y = 0.0 }),
+               Velocity({ x = 0.0, y = 0.0 }),
+               Optional()
+            )
+         end
+      end,
+      before = create_empty_entities,
+      after = destroy_world,
+   },
+
+   get_components = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local _ = entities[i]:Get(Position, Velocity, Optional)
+         end
+      end,
+      before = create_populated_world,
+      after = destroy_world,
+   },
+
+   remove_components = {
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            entities[i]:Unset(Position, Velocity, Optional)
+         end
+      end,
+      before = create_populated_world,
+      after = destroy_world,
+   },
+}
+
+-- ----------------------------------------------------------------------------
+-- Module Export
+-- ----------------------------------------------------------------------------
 
 return {
-   add_empty_entity = add_empty_entity,
-   add_entities = add_entities,
-   remove_entities = remove_entities,
-   get_component = get_component,
-   get_components = get_components,
-   add_component = add_component,
-   add_components = add_components,
-   remove_component = remove_component,
-   remove_components = remove_components,
-   system_update = system_update,
+   variants = {
+      ["ecs-lua-default"] = default,
+      ["ecs-lua-nobatch"] = nobatch,
+      ["ecs-lua-batch"] = batch,
+   },
 }

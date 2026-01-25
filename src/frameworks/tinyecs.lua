@@ -1,6 +1,6 @@
 ---@diagnostic disable: unused-local
 local tiny = require("tiny")
-local shuffle = require("src.utils").shuffle
+local shuffle = require("src.lib.utils").shuffle
 
 local tiny_addEntity = tiny.addEntity
 local tiny_addSystem = tiny.addSystem

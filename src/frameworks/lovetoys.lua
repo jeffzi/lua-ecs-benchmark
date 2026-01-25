@@ -1,6 +1,6 @@
 ---@diagnostic disable: unused-local
 local lovetoys = require("lovetoys")
-local shuffle = require("src.utils").shuffle
+local shuffle = require("src.lib.utils").shuffle
 
 lovetoys.initialize()
 local lt_class = lovetoys.class

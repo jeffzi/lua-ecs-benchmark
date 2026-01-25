@@ -1,6 +1,6 @@
 ---@diagnostic disable: unused-local
 local nata = require("lib.nata.nata")
-local shuffle = require("src.utils").shuffle
+local shuffle = require("src.lib.utils").shuffle
 
 local nata_new = nata.new
 

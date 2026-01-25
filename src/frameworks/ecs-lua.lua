@@ -13,7 +13,7 @@
 
 ---@diagnostic disable: unused-local
 local ECS = require("lib.ecs-lua.ECS")
-local shuffle = require("src.utils").shuffle
+local shuffle = require("src.lib.utils").shuffle
 
 local ecs_Component = ECS.Component
 local ecs_System = ECS.System

@@ -1,6 +1,6 @@
 ---@diagnostic disable: unused-local
 local Concord = require("lib.Concord.concord.init")
-local shuffle = require("src.utils").shuffle
+local shuffle = require("src.lib.utils").shuffle
 
 local concord_component = Concord.component
 local concord_entity = Concord.entity

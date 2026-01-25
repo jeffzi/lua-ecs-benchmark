@@ -1,6 +1,7 @@
+local Progress = require("src.lib.progress")
 local argparse = require("argparse")
 local luamark = require("luamark")
-local utils = require("src.utils")
+local utils = require("src.lib.utils")
 
 --- Framework modules. Some export tests directly, others export variants.
 local MODULES = {
@@ -65,18 +66,21 @@ local HEADERS = {
 --- @param test_name string Name of the test.
 --- @param all_stats table[] Accumulator for results.
 --- @param max_entities? number Optional max_entities limit for logging.
-local function run_benchmarks(specs, counts, test_name, all_stats, max_entities)
-   local names = utils.keys(specs)
-   table.sort(names)
+--- @param quiet? boolean Suppress console output.
+local function run_benchmarks(specs, counts, test_name, all_stats, max_entities, quiet)
+   if not quiet then
+      local names = utils.keys(specs)
+      table.sort(names)
 
-   local limit_info = max_entities and string.format(" (max_entities=%d)", max_entities) or ""
-   utils.printf(
-      "[%s] Running %d frameworks%s: %s\n",
-      test_name,
-      #names,
-      limit_info,
-      table.concat(names, ", ")
-   )
+      local limit_info = max_entities and string.format(" (max_entities=%d)", max_entities) or ""
+      utils.printf(
+         "[%s] Running %d frameworks%s: %s",
+         test_name,
+         #names,
+         limit_info,
+         table.concat(names, ", ")
+      )
+   end
 
    local params = { params = { n_entities = counts } }
 
@@ -117,7 +121,9 @@ end
 --- @param framework_names? string[] Framework names to benchmark.
 --- @param tests? string[] Test names to run.
 --- @param entity_counts? number[] Entity counts to benchmark.
-local function main(output, framework_names, tests, entity_counts)
+--- @param opts? table Options (no_progress: boolean).
+local function main(output, framework_names, tests, entity_counts, opts)
+   opts = opts or {}
    framework_names = framework_names or FRAMEWORK_NAMES
    tests = tests or TESTS
    entity_counts = entity_counts or ENTITY_COUNTS
@@ -125,6 +131,14 @@ local function main(output, framework_names, tests, entity_counts)
    local all_stats = {}
    local max_count = entity_counts[#entity_counts]
 
+   local bar = Progress({
+      total = #tests,
+      template = "{bar} {pos}/{len} | {msg} | {elapsed} < {eta}",
+      disable = opts.no_progress,
+   })
+   bar:start()
+
+   local i = 0
    for _, test_name in ipairs(tests) do
       -- Group frameworks by max_entities limit
       local groups = {} -- limit -> { name = spec, ... }
@@ -141,22 +155,27 @@ local function main(output, framework_names, tests, entity_counts)
          end
       end
 
+      i = i + 1
+      bar:update(i, test_name)
+
       -- Run each group with appropriate entity counts
       for limit, specs in pairs(groups) do
          if limit == "unlimited" then
-            run_benchmarks(specs, entity_counts, test_name, all_stats, nil)
+            run_benchmarks(specs, entity_counts, test_name, all_stats, nil, not bar.disable)
          else
             local counts = filter_counts(entity_counts, limit)
             if #counts > 0 then
-               run_benchmarks(specs, counts, test_name, all_stats, limit)
+               run_benchmarks(specs, counts, test_name, all_stats, limit, not bar.disable)
             end
          end
       end
    end
 
+   bar:stop(string.format("Completed %d tests in {elapsed}", #tests))
+
    if output then
       utils.write_csv(all_stats, output, HEADERS, ",")
-      print("\nWrote results to " .. output)
+      print("Wrote results to " .. output)
    end
 end
 
@@ -175,12 +194,13 @@ local function cli()
       :convert(tonumber)
       :default(ENTITY_COUNTS)
       :args("+")
+   parser:flag("--no-progress", "Disable live progress display")
    local args = parser:parse()
 
    -- Expand aliases (e.g., "ecs-lua" -> {"ecs-lua-batch", "ecs-lua-nobatch"})
    local frameworks = utils.expand_names(args.framework, FRAMEWORK_ALIASES)
 
-   main(args.output, frameworks, args.test, args.entities)
+   main(args.output, frameworks, args.test, args.entities, { no_progress = args.no_progress })
 end
 
 cli()

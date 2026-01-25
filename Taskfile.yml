@@ -34,6 +34,7 @@ tasks:
       - luarocks list --porcelain lovetoys | grep -q "installed" || luarocks install lovetoys
       - luarocks list --porcelain luamark | grep -q "installed" || luarocks install luamark
       - luarocks list --porcelain tiny-ecs | grep -q "installed" || luarocks install tiny-ecs
+      - luarocks list --porcelain terminal | grep -q "installed" || luarocks install https://raw.githubusercontent.com/lunarmodules/terminal.lua/refs/heads/main/terminal-scm-1.rockspec
     preconditions:
       - sh: luarocks --version
         msg: luarocks not found in PATH.
@@ -44,7 +45,6 @@ tasks:
       - init-submodules
       - install-deps
     cmds:
-      - echo "Running Benchmarks"
       - lua src/main.lua -o "{{.BENCHMARK_PATH}}" {{.CLI_ARGS}}
 
   install-py-deps:

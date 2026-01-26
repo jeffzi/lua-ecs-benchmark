@@ -325,7 +325,7 @@ local batch = {
 
 return {
    variants = {
-      ["ecs-lua-default"] = default,
+      ["ecs-lua"] = default,
       ["ecs-lua-nobatch"] = nobatch,
       ["ecs-lua-batch"] = batch,
    },

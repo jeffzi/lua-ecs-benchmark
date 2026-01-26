@@ -39,11 +39,7 @@ local function _format_bar(pct, width)
    local inner_width = width - 2 -- account for brackets
    local filled = math_floor(pct * inner_width)
    local empty = inner_width - filled
-   return string_format(
-      "[%s%s]",
-      string_rep("█", filled),
-      string_rep("░", empty)
-   )
+   return string_format("[%s%s]", string_rep("█", filled), string_rep("░", empty))
 end
 
 --- ProgressBar class.
@@ -55,6 +51,7 @@ end
 --- @field disable boolean Whether output is disabled.
 --- @field msg string|nil Custom message for {msg} placeholder.
 --- @field start_time number|nil Start time (os.clock()).
+--- @field private _len_width number Width for formatting position/total.
 local ProgressBar = {}
 ProgressBar.__index = ProgressBar
 
@@ -117,7 +114,9 @@ end
 
 --- Render the progress bar to the terminal.
 function ProgressBar:_render()
-   if self.disable then return end
+   if self.disable then
+      return
+   end
    _clear_line()
    io.write(self:_format())
    io.flush()
@@ -125,7 +124,9 @@ end
 
 --- Initialize the terminal and start tracking time.
 function ProgressBar:start()
-   if self.disable then return end
+   if self.disable then
+      return
+   end
    self.start_time = os.clock()
    local ok = pcall(function()
       terminal.initialize()
@@ -140,7 +141,9 @@ end
 --- @param pos number New position.
 --- @param msg? string Optional message for {msg} placeholder.
 function ProgressBar:update(pos, msg)
-   if self.disable then return end
+   if self.disable then
+      return
+   end
    self.pos = pos
    self.msg = msg
    self:_render()
@@ -149,7 +152,9 @@ end
 --- Stop the progress bar and restore the terminal.
 --- @param final_msg? string Optional final message (supports template vars).
 function ProgressBar:stop(final_msg)
-   if self.disable then return end
+   if self.disable then
+      return
+   end
    _clear_line()
    if final_msg then
       io.write(self:_format(final_msg))

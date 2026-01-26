@@ -19,14 +19,14 @@ local FRAMEWORKS = {}
 local FRAMEWORK_ALIASES = {}
 
 for name, mod in pairs(MODULES) do
-   if mod.variants then
+   if not mod.variants then
+      FRAMEWORKS[name] = mod
+   else
       FRAMEWORK_ALIASES[name] = {}
       for variant_name, tests in pairs(mod.variants) do
          FRAMEWORKS[variant_name] = tests
          FRAMEWORK_ALIASES[name][#FRAMEWORK_ALIASES[name] + 1] = variant_name
       end
-   else
-      FRAMEWORKS[name] = mod
    end
 end
 
@@ -46,7 +46,7 @@ local TESTS = {
    "system_update",
 }
 
-local ENTITY_COUNTS = { 10, 100, 1000, 10000, 100000 }
+local ENTITY_COUNTS = { 10, 100, 1000, 10000 }
 
 local HEADERS = {
    "entities",
@@ -60,56 +60,81 @@ local HEADERS = {
    "rounds",
 }
 
---- Run time and memory benchmarks for a set of specs, logging progress.
+--- Log benchmark info when progress bar is disabled.
+--- @param specs table<string, table> Framework specs.
+--- @param test_name string Name of the test.
+--- @param max_entities? number Optional max_entities limit.
+local function log_benchmark_info(specs, test_name, max_entities)
+   local names = utils.keys(specs)
+   table.sort(names)
+
+   local limit_info = max_entities and string.format(" (max_entities=%d)", max_entities) or ""
+   utils.printf(
+      "[%s] Running %d frameworks%s: %s",
+      test_name,
+      #names,
+      limit_info,
+      table.concat(names, ", ")
+   )
+end
+
+local BENCHMARK_TYPES = {
+   { fn = luamark.compare_time, label = "time" },
+   { fn = luamark.compare_memory, label = "memory" },
+}
+
+--- Run time and memory benchmarks for a set of specs.
 --- @param specs table<string, table> Framework specs to benchmark.
 --- @param counts number[] Entity counts to benchmark.
 --- @param test_name string Name of the test.
---- @param all_stats table[] Accumulator for results.
+--- @param all_stats table[] Accumulator for CSV rows.
 --- @param max_entities? number Optional max_entities limit for logging.
---- @param quiet? boolean Suppress console output.
-local function run_benchmarks(specs, counts, test_name, all_stats, max_entities, quiet)
-   if not quiet then
-      local names = utils.keys(specs)
-      table.sort(names)
-
-      local limit_info = max_entities and string.format(" (max_entities=%d)", max_entities) or ""
-      utils.printf(
-         "[%s] Running %d frameworks%s: %s",
-         test_name,
-         #names,
-         limit_info,
-         table.concat(names, ", ")
-      )
+--- @param show_log boolean Whether to show log output.
+--- @param on_benchmark? function Callback after each benchmark type (receives label).
+local function run_benchmarks(
+   specs,
+   counts,
+   test_name,
+   all_stats,
+   max_entities,
+   show_log,
+   on_benchmark
+)
+   if show_log then
+      log_benchmark_info(specs, test_name, max_entities)
    end
 
    local params = { params = { n_entities = counts } }
 
-   for _, benchmark_fn in ipairs({ luamark.compare_time, luamark.compare_memory }) do
+   for _, bench in ipairs(BENCHMARK_TYPES) do
       collectgarbage("collect")
-      for _, result in ipairs(benchmark_fn(specs, params)) do
+      for _, r in ipairs(bench.fn(specs, params)) do
          all_stats[#all_stats + 1] = {
-            result.n_entities,
+            r.n_entities,
             test_name,
-            result.name,
-            result.unit,
-            result.timestamp,
-            result.median,
-            result.ci_lower,
-            result.ci_upper,
-            result.rounds,
+            r.name,
+            r.unit,
+            r.timestamp,
+            r.median,
+            r.ci_lower,
+            r.ci_upper,
+            r.rounds,
          }
+      end
+      if on_benchmark then
+         on_benchmark(bench.label)
       end
    end
 end
 
 --- Filter entity counts to those at or below a limit.
 --- @param counts number[] Entity counts.
---- @param limit number Maximum allowed count.
+--- @param max_allowed number Maximum allowed count.
 --- @return number[] Filtered counts.
-local function filter_counts(counts, limit)
+local function filter_counts(counts, max_allowed)
    local filtered = {}
    for _, n in ipairs(counts) do
-      if n <= limit then
+      if n <= max_allowed then
          filtered[#filtered + 1] = n
       end
    end
@@ -131,47 +156,66 @@ local function main(output, framework_names, tests, entity_counts, opts)
    local all_stats = {}
    local max_count = entity_counts[#entity_counts]
 
+   -- Each test runs 2 benchmarks (time + memory)
    local bar = Progress({
-      total = #tests,
-      template = "{bar} {pos}/{len} | {msg} | {elapsed} < {eta}",
+      total = #tests * 2,
+      template = "{bar} {pct} | {msg} | {elapsed} < {eta}",
       disable = opts.no_progress,
    })
    bar:start()
 
-   local i = 0
+   local show_log = bar.disable
+   local progress_count = 0
    for _, test_name in ipairs(tests) do
-      -- Group frameworks by max_entities limit
-      local groups = {} -- limit -> { name = spec, ... }
+      -- Group frameworks by their max_entities limit (nil means unlimited)
+      local groups = {}
 
       for _, name in ipairs(framework_names) do
-         local spec = FRAMEWORKS[name] and FRAMEWORKS[name][test_name]
+         local tests_for_framework = FRAMEWORKS[name]
+         local spec = tests_for_framework and tests_for_framework[test_name]
          if spec then
             local limit = spec.max_entities
-            if not limit or limit >= max_count then
-               limit = "unlimited"
+            -- Treat limits >= max requested count as unlimited
+            if limit and limit < max_count then
+               groups[limit] = groups[limit] or {}
+               groups[limit][name] = spec
+            else
+               groups.unlimited = groups.unlimited or {}
+               groups.unlimited[name] = spec
             end
-            groups[limit] = groups[limit] or {}
-            groups[limit][name] = spec
          end
       end
 
-      i = i + 1
-      bar:update(i, test_name)
+      -- Progress callback
+      local function on_benchmark(label)
+         progress_count = progress_count + 1
+         bar:update(progress_count, string.format("%s (%s)", test_name, label))
+      end
 
-      -- Run each group with appropriate entity counts
+      -- Run unlimited group first (full entity counts)
+      if groups.unlimited then
+         run_benchmarks(
+            groups.unlimited,
+            entity_counts,
+            test_name,
+            all_stats,
+            nil,
+            show_log,
+            on_benchmark
+         )
+         groups.unlimited = nil
+      end
+
+      -- Run limited groups with filtered counts
       for limit, specs in pairs(groups) do
-         if limit == "unlimited" then
-            run_benchmarks(specs, entity_counts, test_name, all_stats, nil, not bar.disable)
-         else
-            local counts = filter_counts(entity_counts, limit)
-            if #counts > 0 then
-               run_benchmarks(specs, counts, test_name, all_stats, limit, not bar.disable)
-            end
+         local counts = filter_counts(entity_counts, limit)
+         if #counts > 0 then
+            run_benchmarks(specs, counts, test_name, all_stats, limit, show_log, on_benchmark)
          end
       end
    end
 
-   bar:stop(string.format("Completed %d tests in {elapsed}", #tests))
+   bar:stop(string.format("Completed %d tests in {elapsed}", #tests * 2))
 
    if output then
       utils.write_csv(all_stats, output, HEADERS, ",")

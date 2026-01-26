@@ -4,8 +4,7 @@ silent: true
 
 vars:
   OUT_DIR: results
-  CSV: results.csv
-  BENCHMARK_PATH: "{{joinPath .OUT_DIR .CSV}}"
+  JIT: "on" # JIT status for LuaJIT (set to "off" to disable JIT)
 
 tasks:
   default:
@@ -14,7 +13,7 @@ tasks:
       - task: all
 
   all:
-    desc: Benchmark all frameworks and export the plots.
+    desc: Benchmark and export the plots. Use JIT=off to disable JIT (e.g., task all JIT=off).
     cmds:
       - task: benchmark
       - task: export
@@ -28,24 +27,36 @@ tasks:
   install-deps:
     internal: true
     desc: Install Lua dependencies.
+    status:
+      - luarocks show argparse
+      - luarocks show chronos
+      - luarocks show lovetoys
+      - luarocks show luamark
+      - luarocks show tiny-ecs
+      - luarocks show terminal
     cmds:
-      - luarocks list --porcelain argparse | grep -q "installed" || luarocks install argparse
-      - luarocks list --porcelain chronos | grep -q "installed" || luarocks install chronos
-      - luarocks list --porcelain lovetoys | grep -q "installed" || luarocks install lovetoys
-      - luarocks list --porcelain luamark | grep -q "installed" || luarocks install luamark
-      - luarocks list --porcelain tiny-ecs | grep -q "installed" || luarocks install tiny-ecs
-      - luarocks list --porcelain terminal | grep -q "installed" || luarocks install https://raw.githubusercontent.com/lunarmodules/terminal.lua/refs/heads/main/terminal-scm-1.rockspec
+      - luarocks install argparse
+      - luarocks install chronos
+      - luarocks install lovetoys
+      - luarocks install luamark
+      - luarocks install tiny-ecs
+      - luarocks install https://raw.githubusercontent.com/lunarmodules/terminal.lua/refs/heads/main/terminal-scm-1.rockspec
     preconditions:
       - sh: luarocks --version
         msg: luarocks not found in PATH.
 
   benchmark:
-    desc: Benchmark all frameworks.
+    desc: Benchmark with the current Lua interpreter. Use JIT=off to disable JIT (e.g., task benchmark JIT=off).
     deps:
       - init-submodules
       - install-deps
+    vars:
+      LUA_INTERPRETER:
+        sh: lua -e "if jit then print('luajit-{{.JIT}}') else print('lua'.._VERSION:match('%d+%.%d+')) end"
+      JIT_FLAG:
+        sh: lua -e "if jit and '{{.JIT}}'=='off' then print('-joff') end"
     cmds:
-      - lua src/main.lua -o "{{.BENCHMARK_PATH}}" {{.CLI_ARGS}}
+      - lua {{.JIT_FLAG}} src/main.lua -o "{{.OUT_DIR}}/{{.LUA_INTERPRETER}}/results.csv" {{.CLI_ARGS}}
 
   install-py-deps:
     internal: true
@@ -61,8 +72,7 @@ tasks:
     deps:
       - install-py-deps
     cmds:
-      - echo "Exporting Results"
-      - uv run scripts/export.py {{.BENCHMARK_PATH}} {{.OUT_DIR}}
+      - uv run scripts/export.py {{.OUT_DIR}}
 
   update-submodules:
     desc: Update submodules to latest commits and refresh README.

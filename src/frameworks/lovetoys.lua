@@ -275,7 +275,7 @@ local batch = {
 
 return {
    variants = {
-      ["lovetoys-default"] = default,
+      ["lovetoys"] = default,
       ["lovetoys-nobatch"] = nobatch,
       ["lovetoys-batch"] = batch,
    },

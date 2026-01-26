@@ -15,14 +15,17 @@ from tabulate import tabulate
 # Constants
 # =============================================================================
 
-DEFAULT_TIME_UNIT = "s"
-DEFAULT_MEMORY_UNIT = "kb"
 
-EXCLUDED_FROM_PLOTS = {"nata"}
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+README_PATH = REPO_ROOT / "README.md"
+
+TIME = "s"
+MEMORY = "kb"
 
 UNIT_DISPLAY_NAMES = {
-    DEFAULT_TIME_UNIT: "Execution Time",
-    DEFAULT_MEMORY_UNIT: "Memory Usage",
+    TIME: "Execution Time",
+    MEMORY: "Memory Usage",
 }
 
 TIME_UNITS = {
@@ -33,23 +36,29 @@ TIME_UNITS = {
     "ns": 1,
 }
 
-CWD = Path.cwd()
-_SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = _SCRIPT_DIR.parent
-README_PATH = REPO_ROOT / "README.md"
+UNIT_AXIS_CONFIG = {
+    TIME: {
+        "title": "Time",
+        "label_expr": (
+            "datum.value >= 1 ? format(datum.value, '.0f') + 's'"
+            " : datum.value >= 0.001 ? format(datum.value * 1000, '.0f') + 'ms'"
+            " : datum.value >= 0.000001 ? format(datum.value * 1e6, '.0f') + 'µs'"
+            " : format(datum.value * 1e9, '.0f') + 'ns'"
+        ),
+    },
+    MEMORY: {
+        "title": "Memory",
+        "label_expr": (
+            "datum.value >= 1000000 ? format(datum.value / 1000000, '.0f') + ' GB'"
+            " : datum.value >= 1000 ? format(datum.value / 1000, '.0f') + ' MB'"
+            " : datum.value >= 1 ? format(datum.value, '.0f') + ' kB'"
+            " : format(datum.value * 1000, '.0f') + ' B'"
+        ),
+    },
+}
 
-TIME_LABEL_EXPR = (
-    "datum.value >= 1 ? format(datum.value, '.0f') + 's'"
-    " : datum.value >= 0.001 ? format(datum.value * 1000, '.0f') + 'ms'"
-    " : datum.value >= 0.000001 ? format(datum.value * 1e6, '.0f') + 'µs'"
-    " : format(datum.value * 1e9, '.0f') + 'ns'"
-)
-MEMORY_LABEL_EXPR = (
-    "datum.value >= 1000000 ? format(datum.value / 1000000, '.0f') + ' GB'"
-    " : datum.value >= 1000 ? format(datum.value / 1000, '.0f') + ' MB'"
-    " : datum.value >= 1 ? format(datum.value, '.0f') + ' kB'"
-    " : format(datum.value * 1000, '.0f') + ' B'"
-)
+INTERPRETER_ORDER = ["luajit-on", "luajit-off", "lua5.1", "lua5.4"]
+
 
 # =============================================================================
 # Colors
@@ -68,52 +77,77 @@ COLORBLIND_PALETTE = [
 ]
 
 
-def _generate_variant_shades(hex_color: str, count: int) -> list[str]:
+def generate_variant_shades(hex_color: str, count: int) -> list[str]:
     """Generate up to 3 shades of a base color for variants."""
-    # Lightness multipliers: base, lighter, lightest
     multipliers = [1.0, 0.7, 0.5][:count]
-    shades = []
     r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
-    for mult in multipliers:
-        # Blend toward white for lighter shades
-        nr = int(r + (255 - r) * (1 - mult))
-        ng = int(g + (255 - g) * (1 - mult))
-        nb = int(b + (255 - b) * (1 - mult))
-        shades.append(f"#{nr:02x}{ng:02x}{nb:02x}")
-    return shades
+    return [
+        f"#{int(r + (255 - r) * (1 - m)):02x}"
+        f"{int(g + (255 - g) * (1 - m)):02x}"
+        f"{int(b + (255 - b) * (1 - m)):02x}"
+        for m in multipliers
+    ]
 
 
-def _find_base(fw: str, fw_set: set[str]) -> str:
+def find_base(name: str, frameworks: set[str]) -> str:
     """Find root ancestor that exists in framework set."""
-    while "-" in fw:
-        parent = fw.rsplit("-", 1)[0]
-        if parent in fw_set:
-            fw = parent
+    while "-" in name:
+        parent = name.rsplit("-", 1)[0]
+        if parent in frameworks:
+            name = parent
         else:
             break
-    return fw
+    return name
 
 
-def _build_framework_color_scale(frameworks: list[str]) -> tuple[list[str], list[str]]:
+def build_framework_color_scale(frameworks: list[str]) -> tuple[list[str], list[str]]:
     """Build color scale mapping frameworks to colors, returning (domain, range)."""
-    fw_set = set(frameworks)
+    unique_frameworks = set(frameworks)
 
     base_to_variants: dict[str, list[str]] = {}
-    for fw in sorted(frameworks):
-        base = _find_base(fw, fw_set)
-        base_to_variants.setdefault(base, []).append(fw)
+    for framework in sorted(frameworks):
+        base = find_base(framework, unique_frameworks)
+        base_to_variants.setdefault(base, []).append(framework)
 
-    domain = []
-    colors = []
-    for i, (base, variants) in enumerate(base_to_variants.items()):
-        # Assign colors from palette cyclically, gray fallback if exhausted
+    domain, colors = [], []
+    for i, variants in enumerate(base_to_variants.values()):
         base_color = COLORBLIND_PALETTE[i] if i < len(COLORBLIND_PALETTE) else "#949494"
-        shades = _generate_variant_shades(base_color, len(variants))
-        for variant, shade in zip(variants, shades):
-            domain.append(variant)
-            colors.append(shade)
+        shades = generate_variant_shades(base_color, len(variants))
+        domain.extend(variants)
+        colors.extend(shades)
 
     return domain, colors
+
+
+# =============================================================================
+# Results Loading
+# =============================================================================
+
+
+def load_results(results_dir: Path) -> pl.DataFrame:
+    """Load CSVs from interpreter subdirs, adding interpreter column.
+
+    Args:
+        results_dir: Directory containing interpreter subdirectories,
+            each with a results.csv file.
+
+    Returns:
+        Combined DataFrame with interpreter column added.
+    """
+    dfs = []
+    for csv_path in sorted(results_dir.glob("*/results.csv")):
+        interpreter = csv_path.parent.name
+        df = pl.read_csv(csv_path).with_columns(
+            pl.lit(interpreter).alias("interpreter")
+        )
+        dfs.append(df)
+
+    if not dfs:
+        raise ValueError(
+            f"No results.csv files found in subdirectories of {results_dir}"
+        )
+
+    return pl.concat(dfs)
 
 
 # =============================================================================
@@ -121,41 +155,11 @@ def _build_framework_color_scale(frameworks: list[str]) -> tuple[list[str], list
 # =============================================================================
 
 
-def _get_lua_info() -> tuple[str, str | None]:
-    """Get Lua version and JIT status (if LuaJIT)."""
-    try:
-        result = subprocess.run(
-            ["lua", "-v"],  # noqa: S607
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        # Extract just version (e.g., "LuaJIT 2.1.0" from full output)
-        version = result.stdout.strip().split("--")[0].strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return "not found", None
-
-    if "LuaJIT" not in version:
-        return version, None
-
-    try:
-        result = subprocess.run(
-            ["lua", "-e", "print(jit.status() and 'enabled' or 'disabled')"],  # noqa: S607
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        jit_status = result.stdout.strip()
-        return version, jit_status
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return version, None
-
-
-def _get_cpu_model() -> str:
+def get_cpu_model() -> str:
     """Get CPU model name."""
     system = platform.system()
-    if system == "Darwin":
-        try:
+    try:
+        if system == "Darwin":
             result = subprocess.run(
                 ["sysctl", "-n", "machdep.cpu.brand_string"],
                 capture_output=True,
@@ -163,58 +167,42 @@ def _get_cpu_model() -> str:
                 check=True,
             )
             return result.stdout.strip()
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
-    elif system == "Linux":
-        try:
+        if system == "Linux":
             with open("/proc/cpuinfo") as f:
                 for line in f:
                     if line.startswith("model name"):
                         return line.split(":")[1].strip()
-        except FileNotFoundError:
-            pass
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        pass
     return platform.processor() or platform.machine()
 
 
-def _get_os_version() -> str:
+def get_os_version() -> str:
     """Get concise OS version string."""
     system = platform.system()
     if system == "Darwin":
-        mac_ver = platform.mac_ver()[0]
-        return f"macOS {mac_ver}" if mac_ver else "macOS"
+        return f"macOS {platform.mac_ver()[0]}" if platform.mac_ver()[0] else "macOS"
     if system == "Linux":
         try:
             import distro
 
             return distro.name(pretty=True)
         except ImportError:
-            return f"Linux {platform.release()}"
+            pass
     return f"{system} {platform.release()}"
 
 
-def _get_specs() -> str:
+def get_specs() -> str:
     """Build formatted system specifications string."""
-    lua_version, jit_status = _get_lua_info()
-    lua_str = f"{lua_version} (JIT {jit_status})" if jit_status else lua_version
-
-    physical = psutil.cpu_count(logical=False)
-    logical = psutil.cpu_count(logical=True)
-    cores_str = f"{physical} cores ({logical} threads)"
-
     specs = [
-        f"Lua: {lua_str}",
-        f"OS: {_get_os_version()}",
-        f"CPU: {_get_cpu_model()}",
-        f"Cores: {cores_str}",
+        f"OS: {get_os_version()}",
+        f"CPU: {get_cpu_model()}",
+        f"Cores: {psutil.cpu_count(logical=False)} cores ({psutil.cpu_count(logical=True)} threads)",
     ]
-
     cpu_freq = psutil.cpu_freq()
     if cpu_freq and cpu_freq.max:
         specs.append(f"Max Frequency: {cpu_freq.max / 1000:.2f} GHz")
-
-    mem = psutil.virtual_memory()
-    specs.append(f"Memory: {mem.total / (1024**3):.0f} GB")
-
+    specs.append(f"Memory: {psutil.virtual_memory().total / (1024**3):.0f} GB")
     return "\n".join(specs)
 
 
@@ -223,14 +211,14 @@ def _get_specs() -> str:
 # =============================================================================
 
 
-def _update_section(content: str, marker: str, new_content: str) -> str:
+def update_section(content: str, marker: str, new_content: str) -> str:
     """Replace content between AUTO-GENERATED-CONTENT markers."""
     pattern = rf"(<!-- AUTO-GENERATED-CONTENT:START \({marker}\) -->\n).*?(\n<!-- AUTO-GENERATED-CONTENT:END -->)"
     replacement = rf"\g<1>{new_content}\g<2>"
     return re.sub(pattern, replacement, content, flags=re.DOTALL)
 
 
-def _natural_duration(ns: float) -> str:
+def natural_duration(ns: float) -> str:
     """Convert nanoseconds to human-readable duration string."""
     for unit, factor in TIME_UNITS.items():
         if ns >= factor:
@@ -238,12 +226,12 @@ def _natural_duration(ns: float) -> str:
     return f"{ns} ns"
 
 
-def _format_value(value: float | None, unit: str, bold: bool = False) -> str:
+def format_value(value: float | None, unit: str, bold: bool = False) -> str:
     """Format a metric value with appropriate unit, optionally bold."""
     if value is None:
         return ""
-    if unit == DEFAULT_TIME_UNIT:
-        formatted = _natural_duration(value * 1e9)
+    if unit == TIME:
+        formatted = natural_duration(value * 1e9)
     else:
         formatted = humanize.naturalsize(value * 1e3).replace("Bytes", "B")
     return f"**{formatted}**" if bold else formatted
@@ -254,51 +242,59 @@ def _format_value(value: float | None, unit: str, bold: bool = False) -> str:
 # =============================================================================
 
 
-def _pivot_with_best_framework(df: pl.DataFrame) -> tuple[pl.DataFrame, list[str]]:
+def pivot_with_best_framework(df: pl.DataFrame) -> tuple[pl.DataFrame, list[str]]:
     """Pivot dataframe by framework and identify best performer per row."""
     pivoted = df.pivot(
         on="framework", index=["unit", "entities", "test"], values="median"
     )
     framework_cols = pivoted.select(pl.exclude("unit", "entities", "test")).columns
-
-    min_val = pl.min_horizontal(pl.col(fw) for fw in framework_cols)
-    best_fw_expr = pl.coalesce(
-        *[pl.when(pl.col(fw) == min_val).then(pl.lit(fw)) for fw in framework_cols]
-    )
+    min_val = pl.min_horizontal(pl.col(framework) for framework in framework_cols)
 
     pivoted = (
         pivoted.with_columns(
-            pl.col("unit")
-            .replace_strict({DEFAULT_TIME_UNIT: 0, DEFAULT_MEMORY_UNIT: 1})
-            .alias("_unit_order"),
-            best_fw_expr.alias("_best_framework"),
+            pl.col("unit").replace_strict({TIME: 0, MEMORY: 1}).alias("_unit_order"),
+            pl.coalesce(
+                *[
+                    pl.when(pl.col(fw) == min_val).then(pl.lit(fw))
+                    for fw in framework_cols
+                ]
+            ).alias("_best_framework"),
         )
         .sort(["entities", "_unit_order", "test"])
         .drop("_unit_order")
     )
+
     return pivoted, framework_cols
 
 
-def _to_markdown_tables(df: pl.DataFrame) -> str:
+def format_table_row(row: dict, unit: str, framework_cols: list[str]) -> dict[str, str]:
+    """Format a single row for markdown table output."""
+    best = row["_best_framework"]
+    formatted = {"test": row["test"]}
+    for fw in framework_cols:
+        formatted[fw] = format_value(row[fw], unit, bold=(fw == best))
+    return formatted
+
+
+def to_markdown_tables(df: pl.DataFrame) -> str:
     """Convert benchmark results to markdown tables grouped by entity count."""
-    pivoted, framework_cols = _pivot_with_best_framework(df)
-    mds: list[str] = []
+    pivoted, framework_cols = pivot_with_best_framework(df)
+    sections = []
 
-    for (entities,), group in pivoted.group_by(["entities"], maintain_order=True):
-        mds.append(f"#### {entities} entities")
+    for (entities,), entity_group in pivoted.group_by(
+        ["entities"], maintain_order=True
+    ):
+        sections.append(f"### {entities} entities")
 
-        for (unit,), unit_group in group.group_by(["unit"], maintain_order=True):
-            mds.append(f"##### {UNIT_DISPLAY_NAMES[unit]}")
-            rows = []
-            for row in unit_group.to_dicts():
-                best_fw = row["_best_framework"]
-                formatted = {"test": row["test"]}
-                for fw in framework_cols:
-                    formatted[fw] = _format_value(row[fw], unit, bold=(fw == best_fw))
-                rows.append(formatted)
-            mds.append(tabulate(rows, headers="keys", tablefmt="pipe"))
+        for (unit,), unit_group in entity_group.group_by(["unit"], maintain_order=True):
+            sections.append(f"#### {UNIT_DISPLAY_NAMES[unit]}")
+            rows = [
+                format_table_row(row, unit, framework_cols)
+                for row in unit_group.to_dicts()
+            ]
+            sections.append(tabulate(rows, headers="keys", tablefmt="pipe"))
 
-    return "\n\n".join(mds)
+    return "\n\n".join(sections)
 
 
 # =============================================================================
@@ -306,123 +302,122 @@ def _to_markdown_tables(df: pl.DataFrame) -> str:
 # =============================================================================
 
 
-def _create_metric_chart(
+def create_unit_chart(
     df: pl.DataFrame,
-    name: str,
     unit: str,
+    framework_order: list[str],
     color_domain: list[str],
     color_range: list[str],
+    present_interpreters: list[str],
 ) -> alt.Chart:
-    """Create a grouped bar chart for a single metric (time or memory)."""
-    unit_df = df.filter(pl.col("unit") == unit).sort("median")
-    y_min = float(unit_df["median"].min())  # type: ignore[arg-type]
-    y_max = float(unit_df["median"].max())  # type: ignore[arg-type]
-    baseline = y_min * 0.3
+    """Create a chart for a single unit (time or memory)."""
+    config = UNIT_AXIS_CONFIG[unit]
 
-    # Generate tick values at 1, 5 intervals per decade
+    # Compute baseline and domain for log scale bars (bars can't start from 0)
+    y_min, y_max = df.select(
+        pl.col("median").min().cast(pl.Float64).alias("min"),
+        pl.col("median").max().cast(pl.Float64).alias("max"),
+    ).row(0)
+    baseline = y_min * 0.3
+    df = df.with_columns(pl.lit(baseline).alias("_baseline"))
+
+    # Generate tick values at powers of 10 only
     min_exp = math.floor(math.log10(baseline))
     max_exp = math.ceil(math.log10(y_max * 2))
-    tick_values = []
-    for exp in range(min_exp, max_exp + 1):
-        for mult in (1, 5):
-            tick_values.append(mult * 10**exp)
-
-    # Get framework order (fastest first)
-    fw_order = unit_df["framework"].to_list()
-    fw_set = set(fw_order)
-    unit_df = unit_df.with_columns(pl.lit(baseline).alias("_baseline"))
-
-    # Filter color scale to only include frameworks present in this chart
-    filtered_domain = []
-    filtered_range = []
-    for dom, col in zip(color_domain, color_range):
-        if dom in fw_set:
-            filtered_domain.append(dom)
-            filtered_range.append(col)
-
-    y_axis = (
-        alt.Axis(grid=False, values=tick_values, labelExpr=TIME_LABEL_EXPR)
-        if unit == DEFAULT_TIME_UNIT
-        else alt.Axis(grid=False, values=tick_values, labelExpr=MEMORY_LABEL_EXPR)
-    )
+    tick_values = [10**exp for exp in range(min_exp, max_exp + 1)]
 
     return (
-        alt.Chart(unit_df)
+        alt.Chart(df)
         .mark_bar()
         .encode(
-            x=alt.X("entities:N", title="Entities", axis=alt.Axis(grid=False)),
+            x=alt.X(
+                "entities:N",
+                title="Entities",
+                axis=alt.Axis(grid=False, titleFontSize=10, titleFontWeight="normal"),
+            ),
             y=alt.Y(
                 "median:Q",
                 scale=alt.Scale(type="log", base=10, domain=[baseline, y_max * 2]),
                 title=None,
-                axis=y_axis,
-            ),
-            y2="_baseline:Q",
-            xOffset=alt.XOffset("framework:N", sort=fw_order),
-            color=alt.Color(
-                "framework:N",
-                scale=alt.Scale(domain=filtered_domain, range=filtered_range),
-                sort=fw_order,
-                legend=alt.Legend(
-                    title="Framework",
-                    orient="none",
-                    legendX=10,
-                    legendY=10,
-                    fillColor="white",
-                    strokeColor="lightgray",
-                    padding=5,
+                axis=alt.Axis(
+                    grid=False, labelExpr=config["label_expr"], values=tick_values
                 ),
             ),
+            y2="_baseline:Q",
+            xOffset=alt.XOffset("framework:N", sort=framework_order),
+            color=alt.Color(
+                "framework:N",
+                scale=alt.Scale(domain=color_domain, range=color_range),
+                sort=framework_order,
+                legend=alt.Legend(title="Framework"),
+            ),
+            row=alt.Row(
+                "interpreter:N",
+                sort=present_interpreters,
+                title=None,
+                header=alt.Header(labelAngle=0, labelAlign="left"),
+            ),
         )
+        .resolve_scale(y="independent")
+        .resolve_axis(x="independent")
         .properties(
-            title=name,
-            width=400,
-            height=300,
+            width=350,
+            height=150,
+            title=alt.Title(config["title"], anchor="middle", dx=40),
         )
     )
 
 
-def _export_plots(
-    df: pl.DataFrame, out_dir: Path, excluded_frameworks: set[str]
+def export_plots(
+    df: pl.DataFrame, out_dir: Path, present_interpreters: list[str]
 ) -> list[Path]:
     """Export benchmark charts as SVG files, returning list of paths."""
-    df = df.filter(~pl.col("framework").is_in(excluded_frameworks)).sort("framework")
+    df = df.sort("framework")
 
-    # Build consistent color scale for all frameworks
     all_frameworks = df["framework"].unique().sort().to_list()
-    color_domain, color_range = _build_framework_color_scale(all_frameworks)
+    color_domain, color_range = build_framework_color_scale(all_frameworks)
 
     plot_paths = []
-    for test in df["test"].unique(maintain_order=False).sort().to_list():
-        test_df = df.filter(pl.col("test") == test)
-        time_chart = _create_metric_chart(
-            test_df, "Time", DEFAULT_TIME_UNIT, color_domain, color_range
-        )
-        memory_chart = _create_metric_chart(
-            test_df, "Memory", DEFAULT_MEMORY_UNIT, color_domain, color_range
-        )
+    for (test,), test_df in df.sort("test").group_by(["test"], maintain_order=True):
+        test_df = test_df.sort("median")
+        framework_order = sorted(test_df["framework"].unique().to_list())
+        unique_frameworks = set(framework_order)
+        filtered_domain = [
+            d for d, _ in zip(color_domain, color_range) if d in unique_frameworks
+        ]
+        filtered_range = [
+            c for d, c in zip(color_domain, color_range) if d in unique_frameworks
+        ]
 
+        charts = []
+        for (unit,), unit_df in test_df.group_by(["unit"], maintain_order=True):
+            if unit in UNIT_AXIS_CONFIG:
+                charts.append(
+                    create_unit_chart(
+                        unit_df,
+                        unit,
+                        framework_order,
+                        filtered_domain,
+                        filtered_range,
+                        present_interpreters,
+                    )
+                )
         plot_path = out_dir / f"{test}.svg"
-        combined = (
-            alt.hconcat(time_chart, memory_chart)
-            .resolve_scale(color="independent")
-            .resolve_legend(color="independent")
-            .properties(title=test)
+        chart = (
+            alt.hconcat(*charts).resolve_legend(color="shared").properties(title=test)
         )
-        combined.save(plot_path)
+        chart.save(plot_path)
         plot_paths.append(plot_path)
 
     return plot_paths
 
 
-def _plots_to_markdown(plot_paths: list[Path]) -> str:
+def plots_to_markdown(plot_paths: list[Path]) -> str:
     """Convert plot paths to markdown image sections."""
-    sections = []
-    for plot_path in sorted(plot_paths):
-        test = plot_path.stem
-        relative_path = plot_path.relative_to(REPO_ROOT)
-        sections.append(f"#### {test}\n![{test} Plot]({relative_path})")
-    return "\n\n".join(sections)
+    return "\n\n".join(
+        f"#### {p.stem}\n![{p.stem} Plot]({p.relative_to(REPO_ROOT)})"
+        for p in sorted(plot_paths)
+    )
 
 
 # =============================================================================
@@ -430,49 +425,57 @@ def _plots_to_markdown(plot_paths: list[Path]) -> str:
 # =============================================================================
 
 
-def _main(path: Path, out_dir: Path, skip_readme: bool) -> None:
+def export_markdown_tables(df: pl.DataFrame, results_dir: Path, specs: str) -> None:
+    """Export markdown tables per interpreter subdirectory."""
+    for (interpreter,), interpreter_df in df.group_by(
+        ["interpreter"], maintain_order=True
+    ):
+        interpreter_df = interpreter_df.drop("interpreter")
+        results_md_path = results_dir / interpreter / "results.md"
+        content = f"## Benchmark Environment\n\n```\n{specs}\n```\n\n{to_markdown_tables(interpreter_df)}"
+        results_md_path.write_text(content)
+        print(f"Exported markdown tables to {results_md_path.relative_to(Path.cwd())}")
+
+
+def main(results_dir: Path, skip_readme: bool) -> None:
     """Export benchmark results to plots, markdown tables, and README."""
-    df = pl.read_csv(path)
-
-    plot_dir = out_dir / "img"
-    plot_dir.mkdir(exist_ok=True)
-    plot_paths = _export_plots(df, plot_dir, EXCLUDED_FROM_PLOTS)
-    print(f"Exported plots to {plot_dir} directory.")
-
-    table_md = _to_markdown_tables(df)
-
-    results_md_path = out_dir / "results.md"
-    results_md_path.write_text(table_md)
-    print(f"Exported markdown tables to {results_md_path}.")
-
-    if skip_readme:
+    df = load_results(results_dir)
+    if df.is_empty():
+        print("No benchmark data available. Nothing to export.")
         return
 
-    plot_md = _plots_to_markdown(plot_paths)
-    readme = README_PATH.read_text()
-    readme = _update_section(
-        readme, "BENCHMARK_ENVIRONMENT", f"```\n{_get_specs()}\n```"
+    specs = get_specs()
+    interpreters = set(df["interpreter"].unique().to_list())
+    present_interpreters = [i for i in INTERPRETER_ORDER if i in interpreters]
+    present_interpreters.extend(
+        i for i in interpreters if i not in present_interpreters
     )
-    readme = _update_section(readme, "PLOTS", plot_md)
-    readme = _update_section(readme, "TABLES", table_md)
-    README_PATH.write_text(readme)
-    print(f"Updated {README_PATH}.")
+
+    plot_dir = results_dir / "img"
+    plot_dir.mkdir(exist_ok=True)
+    plot_paths = export_plots(df, plot_dir, present_interpreters)
+    print(f"Exported plots to {plot_dir.relative_to(Path.cwd())}")
+    export_markdown_tables(df, results_dir, specs)
+
+    if not skip_readme:
+        readme = README_PATH.read_text()
+        readme = update_section(readme, "BENCHMARK_ENVIRONMENT", f"```\n{specs}\n```")
+        readme = update_section(readme, "PLOTS", plots_to_markdown(plot_paths))
+        README_PATH.write_text(readme)
+        print(f"Updated {README_PATH.relative_to(Path.cwd())}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Export benchmark results to plots and markdown tables."
     )
-    parser.add_argument("path", type=Path, help="CSV containing benchmark results")
     parser.add_argument(
-        "out_dir",
+        "results_dir",
         type=Path,
-        nargs="?",
-        default=CWD,
-        help="Directory to store the charts and markdown tables",
+        help="Results directory with interpreter subdirs (e.g., results/luajit-on/results.csv)",
     )
     parser.add_argument(
         "--skip-readme", action="store_true", help="Skip README.md generation"
     )
     args = parser.parse_args()
-    _main(args.path.resolve(), args.out_dir.resolve(), args.skip_readme)
+    main(args.results_dir.resolve(), args.skip_readme)

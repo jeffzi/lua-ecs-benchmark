@@ -4,6 +4,7 @@ import platform
 import re
 import subprocess
 from pathlib import Path
+from typing import cast
 
 import altair as alt
 import humanize
@@ -34,27 +35,6 @@ TIME_UNITS = {
     "ms": 1e6,
     "µs": 1e3,
     "ns": 1,
-}
-
-UNIT_AXIS_CONFIG = {
-    TIME: {
-        "title": "Time",
-        "label_expr": (
-            "datum.value >= 1 ? format(datum.value, '.0f') + 's'"
-            " : datum.value >= 0.001 ? format(datum.value * 1000, '.0f') + 'ms'"
-            " : datum.value >= 0.000001 ? format(datum.value * 1e6, '.0f') + 'µs'"
-            " : format(datum.value * 1e9, '.0f') + 'ns'"
-        ),
-    },
-    MEMORY: {
-        "title": "Memory",
-        "label_expr": (
-            "datum.value >= 1000000 ? format(datum.value / 1000000, '.0f') + ' GB'"
-            " : datum.value >= 1000 ? format(datum.value / 1000, '.0f') + ' MB'"
-            " : datum.value >= 1 ? format(datum.value, '.0f') + ' kB'"
-            " : format(datum.value * 1000, '.0f') + ' B'"
-        ),
-    },
 }
 
 INTERPRETER_ORDER = ["luajit-on", "luajit-off", "lua5.1", "lua5.4"]
@@ -93,10 +73,9 @@ def find_base(name: str, frameworks: set[str]) -> str:
     """Find root ancestor that exists in framework set."""
     while "-" in name:
         parent = name.rsplit("-", 1)[0]
-        if parent in frameworks:
-            name = parent
-        else:
+        if parent not in frameworks:
             break
+        name = parent
     return name
 
 
@@ -147,7 +126,7 @@ def load_results(results_dir: Path) -> pl.DataFrame:
             f"No results.csv files found in subdirectories of {results_dir}"
         )
 
-    return pl.concat(dfs)
+    return pl.concat(dfs, how="diagonal")
 
 
 # =============================================================================
@@ -226,6 +205,30 @@ def natural_duration(ns: float) -> str:
     return f"{ns} ns"
 
 
+def format_value_expr(col: str, unit: str) -> pl.Expr:
+    """Format a column value based on unit type (TIME or MEMORY)."""
+    c = pl.col(col)
+    if unit == TIME:
+        return (
+            pl.when(c >= 1)
+            .then(c.round(0).cast(pl.Utf8) + " s")
+            .when(c >= 0.001)
+            .then((c * 1000).round(0).cast(pl.Utf8) + " ms")
+            .when(c >= 0.000001)
+            .then((c * 1e6).round(0).cast(pl.Utf8) + " µs")
+            .otherwise((c * 1e9).round(0).cast(pl.Utf8) + " ns")
+        )
+    return (
+        pl.when(c >= 1000000)
+        .then((c / 1000000).round(0).cast(pl.Utf8) + " GB")
+        .when(c >= 1000)
+        .then((c / 1000).round(0).cast(pl.Utf8) + " MB")
+        .when(c >= 1)
+        .then(c.round(0).cast(pl.Utf8) + " kB")
+        .otherwise((c * 1000).round(0).cast(pl.Utf8) + " B")
+    )
+
+
 def format_value(value: float | None, unit: str, bold: bool = False) -> str:
     """Format a metric value with appropriate unit, optionally bold."""
     if value is None:
@@ -248,17 +251,14 @@ def pivot_with_best_framework(df: pl.DataFrame) -> tuple[pl.DataFrame, list[str]
         on="framework", index=["unit", "entities", "test"], values="median"
     )
     framework_cols = pivoted.select(pl.exclude("unit", "entities", "test")).columns
-    min_val = pl.min_horizontal(pl.col(framework) for framework in framework_cols)
 
     pivoted = (
         pivoted.with_columns(
             pl.col("unit").replace_strict({TIME: 0, MEMORY: 1}).alias("_unit_order"),
-            pl.coalesce(
-                *[
-                    pl.when(pl.col(fw) == min_val).then(pl.lit(fw))
-                    for fw in framework_cols
-                ]
-            ).alias("_best_framework"),
+            pl.concat_list([pl.col(fw) for fw in framework_cols])
+            .list.arg_min()
+            .replace_strict(dict(enumerate(framework_cols)))
+            .alias("_best_framework"),
         )
         .sort(["entities", "_unit_order", "test"])
         .drop("_unit_order")
@@ -302,69 +302,187 @@ def to_markdown_tables(df: pl.DataFrame) -> str:
 # =============================================================================
 
 
-def create_unit_chart(
+def create_unit_row(
     df: pl.DataFrame,
-    unit: str,
     framework_order: list[str],
     color_domain: list[str],
     color_range: list[str],
     present_interpreters: list[str],
-) -> alt.Chart:
-    """Create a chart for a single unit (time or memory)."""
-    config = UNIT_AXIS_CONFIG[unit]
+    show_legend: bool,
+    show_header: bool,
+) -> alt.FacetChart:
+    """Create a single row chart for one unit (Time or Memory), faceted by interpreter."""
+    # Compute dynamic tick values for this unit
+    max_raw = df["relative"].max()
+    max_val = 1.0 if max_raw is None else cast(float, max_raw)
+    max_tick = math.ceil(max_val)
+    base_ticks = [1, 2, 5, 10, 15, 20]
+    y_ticks = [t for t in base_ticks if t <= max_tick]
+    # Only add max_tick if it's not too close to the last base tick (>10% gap)
+    if y_ticks and max_tick not in y_ticks:
+        if (max_tick - y_ticks[-1]) / max_tick > 0.1:
+            y_ticks.append(max_tick)
+    elif not y_ticks:
+        y_ticks = [1, max_tick]
 
-    # Compute baseline and domain for log scale bars (bars can't start from 0)
-    y_min, y_max = df.select(
-        pl.col("median").min().cast(pl.Float64).alias("min"),
-        pl.col("median").max().cast(pl.Float64).alias("max"),
-    ).row(0)
-    baseline = y_min * 0.3
-    df = df.with_columns(pl.lit(baseline).alias("_baseline"))
+    base = alt.Chart(df)
 
-    # Generate tick values at powers of 10 only
-    min_exp = math.floor(math.log10(baseline))
-    max_exp = math.ceil(math.log10(y_max * 2))
-    tick_values = [10**exp for exp in range(min_exp, max_exp + 1)]
+    bars = base.mark_bar().encode(
+        x=alt.X(
+            "entities:N",
+            title=None,
+            axis=alt.Axis(grid=False, labelAngle=0, labelFontSize=9),
+        ),
+        y=alt.Y(
+            "relative:Q",
+            title=None,
+            scale=alt.Scale(domain=[0, int(max_tick)]),
+            axis=alt.Axis(
+                grid=True,
+                gridDash=[1, 3],
+                gridColor="#ccc",
+                labelExpr="datum.value + '×'",
+                labelOverlap=True,
+                labelFontSize=9,
+                values=y_ticks,
+                tickCount=len(y_ticks),
+            ),
+        ),
+        xOffset=alt.XOffset("framework:N", sort=framework_order),
+        color=alt.Color(
+            "framework:N",
+            scale=alt.Scale(domain=color_domain, range=color_range),
+            legend=alt.Legend(title=None, labelFontSize=10) if show_legend else None,
+        ),
+    )
+
+    labels = base.mark_text(
+        angle=270,
+        align="left",
+        baseline="middle",
+        dx=1,
+        dy=0,
+        fontSize=8,
+        fontStyle="italic",
+        font="Helvetica, Arial, sans-serif",
+    ).encode(
+        x=alt.X("entities:N"),
+        xOffset=alt.XOffset("framework:N", sort=framework_order),
+        y=alt.Y("relative:Q"),
+        text="display_label:N",
+    )
 
     return (
-        alt.Chart(df)
-        .mark_bar()
-        .encode(
-            x=alt.X(
-                "entities:N",
-                title="Entities",
-                axis=alt.Axis(grid=False, titleFontSize=10, titleFontWeight="normal"),
-            ),
-            y=alt.Y(
-                "median:Q",
-                scale=alt.Scale(type="log", base=10, domain=[baseline, y_max * 2]),
-                title=None,
-                axis=alt.Axis(
-                    grid=False, labelExpr=config["label_expr"], values=tick_values
-                ),
-            ),
-            y2="_baseline:Q",
-            xOffset=alt.XOffset("framework:N", sort=framework_order),
-            color=alt.Color(
-                "framework:N",
-                scale=alt.Scale(domain=color_domain, range=color_range),
-                sort=framework_order,
-                legend=alt.Legend(title="Framework"),
-            ),
-            row=alt.Row(
+        (bars + labels)
+        .properties(width=300, height=150)
+        .facet(
+            column=alt.Column(
                 "interpreter:N",
                 sort=present_interpreters,
                 title=None,
-                header=alt.Header(labelAngle=0, labelAlign="left"),
+                header=alt.Header(
+                    labelAngle=0,
+                    labelAlign="center",
+                    labelFontSize=12,
+                    labelFontWeight="bold",
+                    labelPadding=0,
+                )
+                if show_header
+                else alt.Header(labels=False),
+            ),
+            row=alt.Row(
+                "unit_label:N",
+                title=None,
+                header=alt.Header(
+                    labelAngle=-90,
+                    labelAlign="center",
+                    labelFontSize=12,
+                    labelFontWeight="bold",
+                    labelPadding=0,
+                ),
             ),
         )
-        .resolve_scale(y="independent")
         .resolve_axis(x="independent")
+        .resolve_axis(y="independent")
+    )
+
+
+def create_relative_chart(
+    df: pl.DataFrame,
+    test_name: str,
+    framework_order: list[str],
+    color_domain: list[str],
+    color_range: list[str],
+    present_interpreters: list[str],
+) -> alt.VConcatChart:
+    """Create a relative performance chart with vconcat for units, facet for interpreters."""
+    # Compute relative performance per (interpreter, entities, unit) group
+    df = df.with_columns(
+        (pl.col("median") / pl.col("median").min())
+        .over(["interpreter", "entities", "unit"])
+        .alias("relative"),
+    )
+
+    # Compute rank for label filtering (fastest=1, slowest=max)
+    df = df.with_columns(
+        pl.col("relative")
+        .rank("min")
+        .over(["interpreter", "entities", "unit"])
+        .alias("rank"),
+        pl.col("framework")
+        .n_unique()
+        .over(["interpreter", "entities", "unit"])
+        .alias("n_frameworks"),
+    )
+
+    # Format labels based on unit type
+    df = df.with_columns(
+        pl.when(pl.col("unit") == TIME)
+        .then(format_value_expr("median", TIME))
+        .otherwise(format_value_expr("median", MEMORY))
+        .alias("value_label")
+    )
+
+    # Mark which rows should have labels (fastest and slowest only)
+    df = df.with_columns(
+        pl.when((pl.col("rank") == 1) | (pl.col("rank") == pl.col("n_frameworks")))
+        .then(pl.col("value_label"))
+        .otherwise(pl.lit(""))
+        .alias("display_label"),
+        pl.col("unit")
+        .replace_strict({TIME: "Time", MEMORY: "Memory"})
+        .alias("unit_label"),
+    )
+
+    time_row = create_unit_row(
+        df.filter(pl.col("unit") == TIME),
+        framework_order,
+        color_domain,
+        color_range,
+        present_interpreters,
+        show_legend=True,
+        show_header=True,
+    )
+    memory_row = create_unit_row(
+        df.filter(pl.col("unit") == MEMORY),
+        framework_order,
+        color_domain,
+        color_range,
+        present_interpreters,
+        show_legend=False,
+        show_header=False,
+    )
+
+    return (
+        alt.vconcat(time_row, memory_row)
         .properties(
-            width=350,
-            height=150,
-            title=alt.Title(config["title"], anchor="middle", dx=40),
+            title=alt.Title(
+                test_name, subtitle="1× = fastest, by entity count", subtitleFontSize=10
+            )
         )
+        .configure_view(strokeWidth=0)
+        .configure_legend(padding=0, offset=5)
+        .resolve_legend(color="shared")
     )
 
 
@@ -372,40 +490,28 @@ def export_plots(
     df: pl.DataFrame, out_dir: Path, present_interpreters: list[str]
 ) -> list[Path]:
     """Export benchmark charts as SVG files, returning list of paths."""
-    df = df.sort("framework")
 
     all_frameworks = df["framework"].unique().sort().to_list()
     color_domain, color_range = build_framework_color_scale(all_frameworks)
 
     plot_paths = []
     for (test,), test_df in df.sort("test").group_by(["test"], maintain_order=True):
-        test_df = test_df.sort("median")
         framework_order = sorted(test_df["framework"].unique().to_list())
         unique_frameworks = set(framework_order)
-        filtered_domain = [
-            d for d, _ in zip(color_domain, color_range) if d in unique_frameworks
-        ]
+        filtered_domain = [d for d in color_domain if d in unique_frameworks]
         filtered_range = [
             c for d, c in zip(color_domain, color_range) if d in unique_frameworks
         ]
-
-        charts = []
-        for (unit,), unit_df in test_df.group_by(["unit"], maintain_order=True):
-            if unit in UNIT_AXIS_CONFIG:
-                charts.append(
-                    create_unit_chart(
-                        unit_df,
-                        unit,
-                        framework_order,
-                        filtered_domain,
-                        filtered_range,
-                        present_interpreters,
-                    )
-                )
-        plot_path = out_dir / f"{test}.svg"
-        chart = (
-            alt.hconcat(*charts).resolve_legend(color="shared").properties(title=test)
+        chart = create_relative_chart(
+            test_df,
+            test,
+            framework_order,
+            filtered_domain,
+            filtered_range,
+            present_interpreters,
         )
+
+        plot_path = out_dir / f"{test}.svg"
         chart.save(plot_path)
         plot_paths.append(plot_path)
 
@@ -445,11 +551,10 @@ def main(results_dir: Path, skip_readme: bool) -> None:
         return
 
     specs = get_specs()
-    interpreters = set(df["interpreter"].unique().to_list())
-    present_interpreters = [i for i in INTERPRETER_ORDER if i in interpreters]
-    present_interpreters.extend(
-        i for i in interpreters if i not in present_interpreters
-    )
+    interpreters = set(df["interpreter"].unique())
+    ordered = [i for i in INTERPRETER_ORDER if i in interpreters]
+    unordered = [i for i in interpreters if i not in ordered]
+    present_interpreters = ordered + unordered
 
     plot_dir = results_dir / "img"
     plot_dir.mkdir(exist_ok=True)

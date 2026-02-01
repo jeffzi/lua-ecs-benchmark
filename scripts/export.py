@@ -39,6 +39,8 @@ TIME_UNITS = {
 
 INTERPRETER_ORDER = ["luajit-on", "luajit-off", "lua5.1", "lua5.4"]
 
+MAX_RELATIVE_PERFORMANCE = 20.0
+
 
 # =============================================================================
 # Colors
@@ -245,12 +247,20 @@ def format_value(value: float | None, unit: str, bold: bool = False) -> str:
 # =============================================================================
 
 
-def pivot_with_best_framework(df: pl.DataFrame) -> tuple[pl.DataFrame, list[str]]:
+def pivot_with_best_framework(
+    df: pl.DataFrame, has_groups: bool
+) -> tuple[pl.DataFrame, list[str]]:
     """Pivot dataframe by framework and identify best performer per row."""
-    pivoted = df.pivot(
-        on="framework", index=["unit", "entities", "test"], values="median"
-    )
-    framework_cols = pivoted.select(pl.exclude("unit", "entities", "test")).columns
+    index_cols = ["unit", "entities", "test"]
+    if has_groups:
+        index_cols = ["group"] + index_cols
+
+    pivoted = df.pivot(on="framework", index=index_cols, values="median")
+    framework_cols = pivoted.select(pl.exclude(*index_cols)).columns
+
+    sort_cols = ["entities", "_unit_order", "test"]
+    if has_groups:
+        sort_cols = ["group"] + sort_cols
 
     pivoted = (
         pivoted.with_columns(
@@ -260,7 +270,7 @@ def pivot_with_best_framework(df: pl.DataFrame) -> tuple[pl.DataFrame, list[str]
             .replace_strict(dict(enumerate(framework_cols)))
             .alias("_best_framework"),
         )
-        .sort(["entities", "_unit_order", "test"])
+        .sort(sort_cols)
         .drop("_unit_order")
     )
 
@@ -277,13 +287,26 @@ def format_table_row(row: dict, unit: str, framework_cols: list[str]) -> dict[st
 
 
 def to_markdown_tables(df: pl.DataFrame) -> str:
-    """Convert benchmark results to markdown tables grouped by entity count."""
-    pivoted, framework_cols = pivot_with_best_framework(df)
+    """Convert benchmark results to markdown tables grouped by group, then entity count."""
+    has_groups = "group" in df.columns
+    pivoted, framework_cols = pivot_with_best_framework(df, has_groups)
     sections = []
 
-    for (entities,), entity_group in pivoted.group_by(
-        ["entities"], maintain_order=True
-    ):
+    if has_groups:
+        for (group,), group_df in pivoted.group_by(["group"], maintain_order=True):
+            sections.append(f"## {group.title()}")
+            sections.append(_format_entity_tables(group_df, framework_cols))
+    else:
+        sections.append(_format_entity_tables(pivoted, framework_cols))
+
+    return "\n\n".join(sections)
+
+
+def _format_entity_tables(df: pl.DataFrame, framework_cols: list[str]) -> str:
+    """Format tables grouped by entity count and unit."""
+    sections = []
+
+    for (entities,), entity_group in df.group_by(["entities"], maintain_order=True):
         sections.append(f"### {entities} entities")
 
         for (unit,), unit_group in entity_group.group_by(["unit"], maintain_order=True):
@@ -315,7 +338,7 @@ def create_unit_row(
     # Compute dynamic tick values for this unit
     max_raw = df["relative"].max()
     max_val = 1.0 if max_raw is None else cast(float, max_raw)
-    max_tick = math.ceil(max_val)
+    max_tick = max(1, math.ceil(max_val))
     base_ticks = [1, 2, 5, 10, 15, 20]
     y_ticks = [t for t in base_ticks if t <= max_tick]
     # Only add max_tick if it's not too close to the last base tick (>10% gap)
@@ -352,7 +375,7 @@ def create_unit_row(
         color=alt.Color(
             "framework:N",
             scale=alt.Scale(domain=color_domain, range=color_range),
-            legend=alt.Legend(title=None, labelFontSize=10) if show_legend else None,
+            legend=alt.Legend(title=None, labelFontSize=9) if show_legend else None,
         ),
     )
 
@@ -383,7 +406,7 @@ def create_unit_row(
                 header=alt.Header(
                     labelAngle=0,
                     labelAlign="center",
-                    labelFontSize=12,
+                    labelFontSize=10,
                     labelFontWeight="bold",
                     labelPadding=0,
                 )
@@ -396,7 +419,7 @@ def create_unit_row(
                 header=alt.Header(
                     labelAngle=-90,
                     labelAlign="center",
-                    labelFontSize=12,
+                    labelFontSize=10,
                     labelFontWeight="bold",
                     labelPadding=0,
                 ),
@@ -422,6 +445,9 @@ def create_relative_chart(
         .over(["interpreter", "entities", "unit"])
         .alias("relative"),
     )
+
+    # Filter out outliers
+    df = df.filter(pl.col("relative") <= MAX_RELATIVE_PERFORMANCE)
 
     # Compute rank for label filtering (fastest=1, slowest=max)
     df = df.with_columns(
@@ -463,21 +489,39 @@ def create_relative_chart(
         show_legend=True,
         show_header=True,
     )
-    memory_row = create_unit_row(
-        df.filter(pl.col("unit") == MEMORY),
-        framework_order,
-        color_domain,
-        color_range,
-        present_interpreters,
-        show_legend=False,
-        show_header=False,
-    )
+
+    # Check if all memory values are effectively 0 (< 1 byte, displays as "0.0 B")
+    memory_df = df.filter(pl.col("unit") == MEMORY)
+    max_memory = cast(float | None, memory_df["median"].max())
+    all_memory_zero = max_memory is None or max_memory < 0.001  # < 1 byte in kb
+
+    if all_memory_zero:
+        note_text = (
+            alt.Chart(pl.DataFrame({"text": ["Note: memory omitted (no allocation)"]}))
+            .mark_text(align="left", fontSize=8, fontStyle="italic", color="#666")
+            .encode(text="text:N")
+            .properties(width=300, height=15)
+        )
+        rows = alt.vconcat(time_row, note_text)
+    else:
+        memory_row = create_unit_row(
+            memory_df,
+            framework_order,
+            color_domain,
+            color_range,
+            present_interpreters,
+            show_legend=False,
+            show_header=False,
+        )
+        rows = alt.vconcat(time_row, memory_row)
 
     return (
-        alt.vconcat(time_row, memory_row)
-        .properties(
+        rows.properties(
             title=alt.Title(
-                test_name, subtitle="1× = fastest, by entity count", subtitleFontSize=10
+                test_name,
+                subtitle="1× = best, by entity count",
+                fontSize=12,
+                subtitleFontSize=9,
             )
         )
         .configure_view(strokeWidth=0)
@@ -488,13 +532,14 @@ def create_relative_chart(
 
 def export_plots(
     df: pl.DataFrame, out_dir: Path, present_interpreters: list[str]
-) -> list[Path]:
-    """Export benchmark charts as SVG files, returning list of paths."""
-
+) -> dict[str, list[Path]]:
+    """Export benchmark charts as SVG files, returning dict of group -> paths."""
     all_frameworks = df["framework"].unique().sort().to_list()
     color_domain, color_range = build_framework_color_scale(all_frameworks)
 
-    plot_paths = []
+    has_groups = "group" in df.columns
+    plot_paths: dict[str, list[Path]] = {}
+
     for (test,), test_df in df.sort("test").group_by(["test"], maintain_order=True):
         framework_order = sorted(test_df["framework"].unique().to_list())
         unique_frameworks = set(framework_order)
@@ -502,28 +547,65 @@ def export_plots(
         filtered_range = [
             c for d, c in zip(color_domain, color_range) if d in unique_frameworks
         ]
+
+        if has_groups:
+            group = cast(str, test_df["group"].first())
+            chart_title = f"{group}/{test}"
+            group_dir = out_dir / group
+            group_dir.mkdir(exist_ok=True)
+            plot_path = group_dir / f"{test}.svg"
+        else:
+            group = ""
+            chart_title = cast(str, test)
+            plot_path = out_dir / f"{test}.svg"
+
         chart = create_relative_chart(
             test_df,
-            test,
+            chart_title,
             framework_order,
             filtered_domain,
             filtered_range,
             present_interpreters,
         )
 
-        plot_path = out_dir / f"{test}.svg"
         chart.save(plot_path)
-        plot_paths.append(plot_path)
+        plot_paths.setdefault(group, []).append(plot_path)
 
     return plot_paths
 
 
-def plots_to_markdown(plot_paths: list[Path]) -> str:
-    """Convert plot paths to markdown image sections."""
-    return "\n\n".join(
-        f"#### {p.stem}\n![{p.stem} Plot]({p.relative_to(REPO_ROOT)})"
-        for p in sorted(plot_paths)
-    )
+def plots_to_markdown(plot_paths: dict[str, list[Path]]) -> str:
+    """Convert plot paths to markdown image sections, organized by group."""
+    sections = []
+
+    for group in sorted(plot_paths.keys()):
+        paths = sorted(plot_paths[group])
+        if group:
+            sections.append(f"#### {group.title()}")
+            for p in paths:
+                sections.append(
+                    f"##### {p.stem}\n![{p.stem} Plot]({p.relative_to(REPO_ROOT)})"
+                )
+        else:
+            for p in paths:
+                sections.append(
+                    f"#### {p.stem}\n![{p.stem} Plot]({p.relative_to(REPO_ROOT)})"
+                )
+
+    return "\n\n".join(sections)
+
+
+def outputs_to_markdown(results_dir: Path, interpreters: list[str]) -> str:
+    """Generate markdown table of result files per interpreter."""
+    rows = []
+    for interp in interpreters:
+        md_path = results_dir / interp / "results.md"
+        csv_path = results_dir / interp / "results.csv"
+        md_link = f"[results.md]({md_path.relative_to(REPO_ROOT)})"
+        csv_link = f"[results.csv]({csv_path.relative_to(REPO_ROOT)})"
+        rows.append({"Interpreter": interp, "Markdown": md_link, "CSV": csv_link})
+
+    return tabulate(rows, headers="keys", tablefmt="pipe")
 
 
 # =============================================================================
@@ -538,6 +620,7 @@ def export_markdown_tables(df: pl.DataFrame, results_dir: Path, specs: str) -> N
     ):
         interpreter_df = interpreter_df.drop("interpreter")
         results_md_path = results_dir / interpreter / "results.md"
+        results_md_path.parent.mkdir(parents=True, exist_ok=True)
         content = f"## Benchmark Environment\n\n```\n{specs}\n```\n\n{to_markdown_tables(interpreter_df)}"
         results_md_path.write_text(content)
         print(f"Exported markdown tables to {results_md_path.relative_to(Path.cwd())}")
@@ -556,7 +639,7 @@ def main(results_dir: Path, skip_readme: bool) -> None:
     unordered = [i for i in interpreters if i not in ordered]
     present_interpreters = ordered + unordered
 
-    plot_dir = results_dir / "img"
+    plot_dir = results_dir / "plots"
     plot_dir.mkdir(exist_ok=True)
     plot_paths = export_plots(df, plot_dir, present_interpreters)
     print(f"Exported plots to {plot_dir.relative_to(Path.cwd())}")
@@ -566,6 +649,9 @@ def main(results_dir: Path, skip_readme: bool) -> None:
         readme = README_PATH.read_text()
         readme = update_section(readme, "BENCHMARK_ENVIRONMENT", f"```\n{specs}\n```")
         readme = update_section(readme, "PLOTS", plots_to_markdown(plot_paths))
+        readme = update_section(
+            readme, "OUTPUTS", outputs_to_markdown(results_dir, present_interpreters)
+        )
         README_PATH.write_text(readme)
         print(f"Updated {README_PATH.relative_to(Path.cwd())}")
 

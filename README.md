@@ -11,16 +11,6 @@ This repository hosts a benchmark suite for popular Lua ECS (Entity-Component-Sy
 - **[ecs-lua](https://github.com/nidorx/ecs-lua)**: A full-featured ECS library for Lua.
 - **[nata](https://github.com/tesselode/nata)**: Entity management for Lua.
 
-### Pinned Versions
-
-Libraries included as git submodules:
-
-| Library | Commit |
-|---------|--------|
-| [Concord](https://github.com/Keyslam-Group/Concord) | [`848652f`](https://github.com/Keyslam-Group/Concord/tree/848652f68887db0c4261efe499facbec88959d03) |
-| [ecs-lua](https://github.com/nidorx/ecs-lua) | [`c6be4a8`](https://github.com/nidorx/ecs-lua/tree/c6be4a85b13caf1f73facc816a08f20737e4e545) |
-| [nata](https://github.com/tesselode/nata) | [`eb9d49b`](https://github.com/tesselode/nata/tree/eb9d49bdb32b964be9419f50dfec14e9adb1bcf0) |
-
 ## Benchmark Tests
 
 This repository offers a suite of benchmarks designed to evaluate various aspects of popular Entity-Component-System (ECS) frameworks used in Lua. These benchmarks are tailored to assess key functionalities of ECS frameworks, including the efficiency of update systems, adding and removing components, and the dynamics of entity creation and management.
@@ -47,90 +37,68 @@ Libraries are automatically installed, provided the tools above are installed.
 
 ## Results
 
-- `nata` is not displayed in plots and not tested for entities=100000 because of the very long execution time.
+- Frameworks with relative performance exceeding 20× the fastest are excluded from charts to improve readability.
 - The results are expressed in terms of **median** execution time and memory usage; _lower is better_.
+
+<!-- AUTO-GENERATED-CONTENT:START (OUTPUTS) -->
+| Interpreter   | Markdown                                   | CSV                                          |
+|:--------------|:-------------------------------------------|:---------------------------------------------|
+| luajit-on     | [results.md](results/luajit-on/results.md) | [results.csv](results/luajit-on/results.csv) |
+<!-- AUTO-GENERATED-CONTENT:END -->
+
+Plots: [results/plots/](results/plots/)
 
 ### Benchmark environment
 
+<!-- AUTO-GENERATED-CONTENT:START (BENCHMARK_ENVIRONMENT) -->
 ```
-Lua Version: LuaJIT 2.1.1765228720 -- Copyright (C) 2005-2025 Mike Pall. https://luajit.org/
-OS: Darwin
-OS Version: Darwin Kernel Version 25.2.0: Tue Nov 18 21:07:05 PST 2025; root:xnu-12377.61.12~1/RELEASE_ARM64_T6020
-Processor: arm64
-Physical cores: 12
-Total cores: 12
-Min Frequency: 702.00Mhz
-Max Frequency: 3504.00Mhz
-Memory: 64.00GB
+OS: macOS 26.2
+CPU: Apple M2 Max
+Cores: 12 cores (12 threads)
+Max Frequency: 3.50 GHz
+Memory: 64 GB
 ```
+<!-- AUTO-GENERATED-CONTENT:END -->
 
 ### Plots
 
-Note that the y-axis is on a log scale.
+<!-- AUTO-GENERATED-CONTENT:START (PLOTS) -->
+#### Component
 
-#### add_component
-![add_component Plot](results/img/add_component.svg)
+##### add
+![add Plot](results/plots/component/add.svg)
 
-#### add_components
-![add_components Plot](results/img/add_components.svg)
+##### add_multi
+![add_multi Plot](results/plots/component/add_multi.svg)
 
-#### add_empty_entity
-![add_empty_entity Plot](results/img/add_empty_entity.svg)
+##### get
+![get Plot](results/plots/component/get.svg)
 
-#### add_entities
-![add_entities Plot](results/img/add_entities.svg)
+##### get_multi
+![get_multi Plot](results/plots/component/get_multi.svg)
 
-#### get_component
-![get_component Plot](results/img/get_component.svg)
+##### remove
+![remove Plot](results/plots/component/remove.svg)
 
-#### get_components
-![get_components Plot](results/img/get_components.svg)
+##### remove_multi
+![remove_multi Plot](results/plots/component/remove_multi.svg)
 
-#### remove_component
-![remove_component Plot](results/img/remove_component.svg)
+#### Entity
 
-#### remove_components
-![remove_components Plot](results/img/remove_components.svg)
+##### create_empty
+![create_empty Plot](results/plots/entity/create_empty.svg)
 
-#### remove_entities
-![remove_entities Plot](results/img/remove_entities.svg)
+##### create_with_components
+![create_with_components Plot](results/plots/entity/create_with_components.svg)
 
-#### system_update
-![system_update Plot](results/img/system_update.svg)
+##### destroy
+![destroy Plot](results/plots/entity/destroy.svg)
 
-### Tables
+#### System
 
-#### 10 entities
-
-##### Execution Time
-
-| test              | concord   | ecs-lua    | lovetoys   | nata        | tinyecs    |
-|:------------------|:----------|:-----------|:-----------|:------------|:-----------|
-| add_component     | 3.88 µs   | 2.42 µs    | 5.62 µs    | 1.08 µs     | **625 ns** |
-| add_components    | 13.2 µs   | 8.46 µs    | 17.8 µs    | **1.71 µs** | 2.08 µs    |
-| add_empty_entity  | 34.8 µs   | 3.5 µs     | 2.79 µs    | 4.29 µs     | **958 ns** |
-| add_entities      | 42 µs     | 9.88 µs    | 7.88 µs    | 4.58 µs     | **1.5 µs** |
-| get_component     | 125 ns    | 167 ns     | **42 ns**  | 42 ns       | 42 ns      |
-| get_components    | 167 ns    | 1.83 µs    | 83 ns      | **42 ns**   | 42 ns      |
-| remove_component  | 28.4 µs   | 2.54 µs    | 2.96 µs    | **583 ns**  | 1.21 µs    |
-| remove_components | 32.2 µs   | 4.5 µs     | 9.12 µs    | **583 ns**  | 1.12 µs    |
-| remove_entities   | 68.4 µs   | **667 ns** | 1.04 µs    |             | 1.5 µs     |
-| system_update     | 151 µs    | 3.62 µs    | **83 ns**  | 208 ns      | 15.3 µs    |
-
-##### Memory Usage
-
-| test              | concord   | ecs-lua   | lovetoys   | nata       | tinyecs    |
-|:------------------|:----------|:----------|:-----------|:-----------|:-----------|
-| add_component     | 2.5 kB    | 3.8 kB    | 4.7 kB     | **1.6 kB** | 1.7 kB     |
-| add_components    | 7.5 kB    | 13.4 kB   | 13.2 kB    | **3.8 kB** | 3.8 kB     |
-| add_empty_entity  | 5.9 kB    | 9.2 kB    | 5.3 kB     | 2.0 kB     | **1.8 kB** |
-| add_entities      | 11.7 kB   | 20.0 kB   | 11.1 kB    | 4.2 kB     | **4.0 kB** |
-| get_component     | **0 B**   | 859 B     | 0 B        | 0 B        | 0 B        |
-| get_components    | **0 B**   | 2.3 kB    | 0 B        | 0 B        | 0 B        |
-| remove_component  | 1.5 kB    | 1.7 kB    | 1.6 kB     | **0 B**    | 695 B      |
-| remove_components | 1.8 kB    | 2.1 kB    | 4.7 kB     | **0 B**    | 695 B      |
-| remove_entities   | 3.5 kB    | 1.1 kB    | **0 B**    |            | 703 B      |
-| system_update     | 1.4 kB    | 5.0 kB    | **0 B**    | 0 B        | 2.7 kB     |
+##### update
+![update Plot](results/plots/system/update.svg)
+<!-- AUTO-GENERATED-CONTENT:END -->
 
 ## Contributing
 

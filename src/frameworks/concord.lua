@@ -69,12 +69,12 @@ local function clear_world(ctx)
 end
 
 -- ----------------------------------------------------------------------------
--- Tests
+-- Entity Tests
 -- ----------------------------------------------------------------------------
 
---- @type BenchmarkModule
-return {
-   add_empty_entity = {
+--- @type BenchmarkTests
+local entity = {
+   create_empty = {
       fn = function(ctx, p)
          local world = ctx.world
          for _ = 1, p.n_entities do
@@ -86,7 +86,7 @@ return {
       after = clear_world,
    },
 
-   add_entities = {
+   create_with_components = {
       fn = function(ctx, p)
          local world = ctx.world
          for _ = 1, p.n_entities do
@@ -98,7 +98,7 @@ return {
       after = clear_world,
    },
 
-   remove_entities = {
+   destroy = {
       fn = function(ctx, _p)
          local world, entities = ctx.world, ctx.entities
          for i = 1, #entities do
@@ -109,8 +109,15 @@ return {
       before = create_populated_world,
       after = clear_world,
    },
+}
 
-   get_component = {
+-- ----------------------------------------------------------------------------
+-- Component Tests
+-- ----------------------------------------------------------------------------
+
+--- @type BenchmarkTests
+local component = {
+   get = {
       fn = function(ctx, _p)
          local entities = ctx.entities
          for i = 1, #entities do
@@ -121,21 +128,21 @@ return {
       after = clear_world,
    },
 
-   get_components = {
+   get_multi = {
       fn = function(ctx, _p)
          local entities = ctx.entities
          for i = 1, #entities do
-            local entity = entities[i]
-            local _ = entity.Position
-            _ = entity.Velocity
-            _ = entity.Optional
+            local e = entities[i]
+            local _ = e.Position
+            _ = e.Velocity
+            _ = e.Optional
          end
       end,
       before = create_populated_world,
       after = clear_world,
    },
 
-   add_component = {
+   add = {
       fn = function(ctx, _p)
          local world, entities = ctx.world, ctx.entities
          for i = 1, #entities do
@@ -147,12 +154,12 @@ return {
       after = clear_world,
    },
 
-   add_components = {
+   add_multi = {
       fn = function(ctx, _p)
          local world, entities = ctx.world, ctx.entities
          for i = 1, #entities do
-            local entity = entities[i]
-            entity:give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0):give("Optional")
+            local e = entities[i]
+            e:give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0):give("Optional")
          end
          world:__flush()
       end,
@@ -160,7 +167,7 @@ return {
       after = clear_world,
    },
 
-   remove_component = {
+   remove = {
       fn = function(ctx, _p)
          local world, entities = ctx.world, ctx.entities
          for i = 1, #entities do
@@ -172,47 +179,54 @@ return {
       after = clear_world,
    },
 
-   remove_components = {
+   remove_multi = {
       fn = function(ctx, _p)
          local world, entities = ctx.world, ctx.entities
          for i = 1, #entities do
-            local entity = entities[i]
-            entity:remove("Position")
-            entity:remove("Velocity")
-            entity:remove("Optional")
+            local e = entities[i]
+            e:remove("Position")
+            e:remove("Velocity")
+            e:remove("Optional")
          end
          world:__flush()
       end,
       before = create_populated_world,
       after = clear_world,
    },
+}
 
-   system_update = {
+-- ----------------------------------------------------------------------------
+-- System Tests
+-- ----------------------------------------------------------------------------
+
+--- @type BenchmarkTests
+local system = {
+   update = {
       fn = function(ctx, _p)
          ctx.world:emit("update", 1 / 60)
       end,
       before = function(_ctx, p)
          local world = concord_world()
 
-         local entity, padding, should_shuffle
+         local entity_item, padding, should_shuffle
          for i = 1, p.n_entities do
-            entity = concord_entity(world)
-            entity:give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0)
+            entity_item = concord_entity(world)
+            entity_item:give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0)
 
             padding = i % 4
             if padding == 1 then
-               entity:give("Padding1")
+               entity_item:give("Padding1")
             elseif padding == 2 then
-               entity:give("Padding2")
+               entity_item:give("Padding2")
             elseif padding == 3 then
-               entity:give("Padding3")
+               entity_item:give("Padding3")
             end
 
             should_shuffle = (i + 1) % 4
             if should_shuffle == 0 then
-               entity:remove("Position")
+               entity_item:remove("Position")
             elseif should_shuffle == 1 then
-               entity:remove("Velocity")
+               entity_item:remove("Velocity")
             end
          end
 
@@ -234,4 +248,15 @@ return {
       end,
       after = clear_world,
    },
+}
+
+-- ----------------------------------------------------------------------------
+-- Module Export
+-- ----------------------------------------------------------------------------
+
+--- @type BenchmarkModule
+return {
+   entity = entity,
+   component = component,
+   system = system,
 }

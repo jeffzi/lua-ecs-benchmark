@@ -84,22 +84,22 @@ local function create_system_world(_ctx, p)
    local world = ecs_World(nil, 60, false)
 
    for i = 1, p.n_entities do
-      local entity = world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }))
+      local e = world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }))
 
       local padding = i % 4
       if padding == 1 then
-         entity.Padding1 = Padding1()
+         e.Padding1 = Padding1()
       elseif padding == 2 then
-         entity.Padding2 = Padding2()
+         e.Padding2 = Padding2()
       elseif padding == 3 then
-         entity.Padding3 = Padding3()
+         e.Padding3 = Padding3()
       end
 
       local should_shuffle = (i + 1) % 4
       if should_shuffle == 0 then
-         entity:Unset(Position)
+         e:Unset(Position)
       elseif should_shuffle == 1 then
-         entity:Unset(Velocity)
+         e:Unset(Velocity)
       end
    end
 
@@ -124,209 +124,245 @@ local function create_system_world(_ctx, p)
 end
 
 -- ----------------------------------------------------------------------------
--- Default Tests
+-- Entity Tests
 -- ----------------------------------------------------------------------------
 
-local default = {
-   add_empty_entity = {
-      fn = function(ctx, p)
-         local world = ctx.world
-         local timestep = ctx.timestep + 1
-         for _ = 1, p.n_entities do
-            world:Entity()
-         end
-         world:Update("process", timestep * ctx.dt)
-         ctx.timestep = timestep
-      end,
-      before = create_world,
-      after = destroy_world,
-   },
+--- @type BenchmarkSpec
+local create_empty = {
+   fn = function(ctx, p)
+      local world = ctx.world
+      local timestep = ctx.timestep + 1
+      for _ = 1, p.n_entities do
+         world:Entity()
+      end
+      world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = create_world,
+   after = destroy_world,
+}
 
-   remove_entities = {
-      fn = function(ctx, _p)
-         local world, entities = ctx.world, ctx.entities
-         for i = 1, #entities do
-            world:Remove(entities[i])
-         end
-         world:Update("process", ctx.timestep * ctx.dt)
-      end,
-      before = create_populated_world,
-      after = destroy_world,
-   },
+--- @type BenchmarkSpec
+local destroy = {
+   fn = function(ctx, _p)
+      local world, entities = ctx.world, ctx.entities
+      for i = 1, #entities do
+         world:Remove(entities[i])
+      end
+      world:Update("process", ctx.timestep * ctx.dt)
+   end,
+   before = create_populated_world,
+   after = destroy_world,
+}
 
-   get_component = {
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
-            local _ = entities[i][Position]
-         end
-      end,
-      before = create_populated_world,
-      after = destroy_world,
-   },
+--- @type BenchmarkSpec
+local nobatch_create_with_components = {
+   fn = function(ctx, p)
+      local world = ctx.world
+      local timestep = ctx.timestep + 1
+      for _ = 1, p.n_entities do
+         local e = world:Entity()
+         e[Position] = Position({ x = 0.0, y = 0.0 })
+         e[Velocity] = Velocity({ x = 0.0, y = 0.0 })
+      end
+      world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = create_world,
+   after = destroy_world,
+}
 
-   add_component = {
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
-            entities[i][Position] = Position({ x = 0.0, y = 0.0 })
-         end
-      end,
-      before = create_empty_entities,
-      after = destroy_world,
-   },
-
-   remove_component = {
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
-            entities[i]:Unset(Position)
-         end
-      end,
-      before = create_populated_world,
-      after = destroy_world,
-   },
-
-   system_update = {
-      fn = function(ctx, _p)
-         local timestep = ctx.timestep + 1
-         ctx.world:Update("process", timestep * ctx.dt)
-         ctx.timestep = timestep
-      end,
-      before = create_system_world,
-      after = destroy_world,
-   },
+--- @type BenchmarkSpec
+local batch_create_with_components = {
+   fn = function(ctx, p)
+      local world = ctx.world
+      local timestep = ctx.timestep + 1
+      for _ = 1, p.n_entities do
+         world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }))
+      end
+      world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = create_world,
+   after = destroy_world,
 }
 
 -- ----------------------------------------------------------------------------
--- Non-batch Tests
+-- Component Tests
 -- ----------------------------------------------------------------------------
 
-local nobatch = {
-   add_entities = {
-      fn = function(ctx, p)
-         local world = ctx.world
-         local timestep = ctx.timestep + 1
-         for _ = 1, p.n_entities do
-            local e = world:Entity()
-            e[Position] = Position({ x = 0.0, y = 0.0 })
-            e[Velocity] = Velocity({ x = 0.0, y = 0.0 })
-         end
-         world:Update("process", timestep * ctx.dt)
-         ctx.timestep = timestep
-      end,
-      before = create_world,
-      after = destroy_world,
-   },
+--- @type BenchmarkSpec
+local get = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         local _ = entities[i][Position]
+      end
+   end,
+   before = create_populated_world,
+   after = destroy_world,
+}
 
-   add_components = {
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
-            local e = entities[i]
-            e[Position] = Position({ x = 0.0, y = 0.0 })
-            e[Velocity] = Velocity({ x = 0.0, y = 0.0 })
-            e[Optional] = Optional()
-         end
-      end,
-      before = create_empty_entities,
-      after = destroy_world,
-   },
+--- @type BenchmarkSpec
+local add = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i][Position] = Position({ x = 0.0, y = 0.0 })
+      end
+   end,
+   before = create_empty_entities,
+   after = destroy_world,
+}
 
-   get_components = {
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
-            local e = entities[i]
-            local _ = e[Position]
-            _ = e[Velocity]
-            _ = e[Optional]
-         end
-      end,
-      before = create_populated_world,
-      after = destroy_world,
-   },
+--- @type BenchmarkSpec
+local remove = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i]:Unset(Position)
+      end
+   end,
+   before = create_populated_world,
+   after = destroy_world,
+}
 
-   remove_components = {
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
-            local e = entities[i]
-            e:Unset(Position)
-            e:Unset(Velocity)
-            e:Unset(Optional)
-         end
-      end,
-      before = create_populated_world,
-      after = destroy_world,
-   },
+--- @type BenchmarkSpec
+local nobatch_get_multi = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         local e = entities[i]
+         local _ = e[Position]
+         _ = e[Velocity]
+         _ = e[Optional]
+      end
+   end,
+   before = create_populated_world,
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local nobatch_add_multi = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         local e = entities[i]
+         e[Position] = Position({ x = 0.0, y = 0.0 })
+         e[Velocity] = Velocity({ x = 0.0, y = 0.0 })
+         e[Optional] = Optional()
+      end
+   end,
+   before = create_empty_entities,
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local nobatch_remove_multi = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         local e = entities[i]
+         e:Unset(Position)
+         e:Unset(Velocity)
+         e:Unset(Optional)
+      end
+   end,
+   before = create_populated_world,
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local batch_get_multi = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         local _ = entities[i]:Get(Position, Velocity, Optional)
+      end
+   end,
+   before = create_populated_world,
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local batch_add_multi = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i]:Set(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }), Optional())
+      end
+   end,
+   before = create_empty_entities,
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local batch_remove_multi = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i]:Unset(Position, Velocity, Optional)
+      end
+   end,
+   before = create_populated_world,
+   after = destroy_world,
 }
 
 -- ----------------------------------------------------------------------------
--- Batch Tests
+-- System Tests
 -- ----------------------------------------------------------------------------
 
-local batch = {
-   add_entities = {
-      fn = function(ctx, p)
-         local world = ctx.world
-         local timestep = ctx.timestep + 1
-         for _ = 1, p.n_entities do
-            world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }))
-         end
-         world:Update("process", timestep * ctx.dt)
-         ctx.timestep = timestep
-      end,
-      before = create_world,
-      after = destroy_world,
-   },
-
-   add_components = {
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
-            entities[i]:Set(
-               Position({ x = 0.0, y = 0.0 }),
-               Velocity({ x = 0.0, y = 0.0 }),
-               Optional()
-            )
-         end
-      end,
-      before = create_empty_entities,
-      after = destroy_world,
-   },
-
-   get_components = {
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
-            local _ = entities[i]:Get(Position, Velocity, Optional)
-         end
-      end,
-      before = create_populated_world,
-      after = destroy_world,
-   },
-
-   remove_components = {
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
-            entities[i]:Unset(Position, Velocity, Optional)
-         end
-      end,
-      before = create_populated_world,
-      after = destroy_world,
-   },
+--- @type BenchmarkSpec
+local update = {
+   fn = function(ctx, _p)
+      local timestep = ctx.timestep + 1
+      ctx.world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = create_system_world,
+   after = destroy_world,
 }
 
 -- ----------------------------------------------------------------------------
 -- Module Export
 -- ----------------------------------------------------------------------------
 
+--- @type VariantModule
 return {
    variants = {
-      ["ecs-lua"] = default,
-      ["ecs-lua-nobatch"] = nobatch,
-      ["ecs-lua-batch"] = batch,
+      ["ecs-lua"] = {
+         entity = {
+            create_empty = create_empty,
+            destroy = destroy,
+         },
+         component = {
+            get = get,
+            add = add,
+            remove = remove,
+         },
+         system = {
+            update = update,
+         },
+      },
+      ["ecs-lua-nobatch"] = {
+         entity = {
+            create_with_components = nobatch_create_with_components,
+         },
+         component = {
+            get_multi = nobatch_get_multi,
+            add_multi = nobatch_add_multi,
+            remove_multi = nobatch_remove_multi,
+         },
+      },
+      ["ecs-lua-batch"] = {
+         entity = {
+            create_with_components = batch_create_with_components,
+         },
+         component = {
+            get_multi = batch_get_multi,
+            add_multi = batch_add_multi,
+            remove_multi = batch_remove_multi,
+         },
+      },
    },
 }

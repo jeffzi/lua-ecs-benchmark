@@ -55,12 +55,12 @@ local function clear_pool(ctx)
 end
 
 -- ----------------------------------------------------------------------------
--- Tests
+-- Entity Tests
 -- ----------------------------------------------------------------------------
 
---- @type BenchmarkModule
-return {
-   add_empty_entity = {
+--- @type BenchmarkTests
+local entity = {
+   create_empty = {
       max_entities = 1000,
       fn = function(ctx, p)
          local pool = ctx.pool
@@ -73,7 +73,7 @@ return {
       after = clear_pool,
    },
 
-   add_entities = {
+   create_with_components = {
       max_entities = 1000,
       fn = function(ctx, p)
          local pool = ctx.pool
@@ -89,98 +89,7 @@ return {
       after = clear_pool,
    },
 
-   get_component = {
-      max_entities = 1000,
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
-            local _ = entities[i].Position
-         end
-      end,
-      before = create_populated_pool,
-      after = clear_pool,
-   },
-
-   get_components = {
-      max_entities = 1000,
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
-            local entity = entities[i]
-            local _ = entity.Position
-            _ = entity.Velocity
-            _ = entity.Optional
-         end
-      end,
-      before = create_populated_pool,
-      after = clear_pool,
-   },
-
-   add_component = {
-      max_entities = 1000,
-      fn = function(ctx, _p)
-         local pool, entities = ctx.pool, ctx.entities
-         for i = 1, #entities do
-            local entity = entities[i]
-            entity.Position = { x = 0.0, y = 0.0 }
-            pool:queue(entity)
-         end
-         pool:flush()
-      end,
-      before = create_empty_entities,
-      after = clear_pool,
-   },
-
-   add_components = {
-      max_entities = 1000,
-      fn = function(ctx, _p)
-         local pool, entities = ctx.pool, ctx.entities
-         for i = 1, #entities do
-            local entity = entities[i]
-            entity.Position = { x = 0.0, y = 0.0 }
-            entity.Velocity = { x = 0.0, y = 0.0 }
-            entity.Optional = {}
-            pool:queue(entity)
-         end
-         pool:flush()
-      end,
-      before = create_empty_entities,
-      after = clear_pool,
-   },
-
-   remove_component = {
-      max_entities = 1000,
-      fn = function(ctx, _p)
-         local pool, entities = ctx.pool, ctx.entities
-         for i = 1, #entities do
-            local entity = entities[i]
-            entity.Position = nil
-            pool:queue(entity)
-         end
-         pool:flush()
-      end,
-      before = create_populated_pool,
-      after = clear_pool,
-   },
-
-   remove_components = {
-      max_entities = 1000,
-      fn = function(ctx, _p)
-         local pool, entities = ctx.pool, ctx.entities
-         for i = 1, #entities do
-            local entity = entities[i]
-            entity.Position = nil
-            entity.Velocity = nil
-            entity.Optional = nil
-            pool:queue(entity)
-         end
-         pool:flush()
-      end,
-      before = create_populated_pool,
-      after = clear_pool,
-   },
-
-   remove_entities = {
+   destroy = {
       max_entities = 1000,
       fn = function(ctx, _p)
          local pool, entities = ctx.pool, ctx.entities
@@ -195,8 +104,113 @@ return {
       before = create_populated_pool,
       after = clear_pool,
    },
+}
 
-   system_update = {
+-- ----------------------------------------------------------------------------
+-- Component Tests
+-- ----------------------------------------------------------------------------
+
+--- @type BenchmarkTests
+local component = {
+   get = {
+      max_entities = 1000,
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local _ = entities[i].Position
+         end
+      end,
+      before = create_populated_pool,
+      after = clear_pool,
+   },
+
+   get_multi = {
+      max_entities = 1000,
+      fn = function(ctx, _p)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local entity_item = entities[i]
+            local _ = entity_item.Position
+            _ = entity_item.Velocity
+            _ = entity_item.Optional
+         end
+      end,
+      before = create_populated_pool,
+      after = clear_pool,
+   },
+
+   add = {
+      max_entities = 1000,
+      fn = function(ctx, _p)
+         local pool, entities = ctx.pool, ctx.entities
+         for i = 1, #entities do
+            local entity_item = entities[i]
+            entity_item.Position = { x = 0.0, y = 0.0 }
+            pool:queue(entity_item)
+         end
+         pool:flush()
+      end,
+      before = create_empty_entities,
+      after = clear_pool,
+   },
+
+   add_multi = {
+      max_entities = 1000,
+      fn = function(ctx, _p)
+         local pool, entities = ctx.pool, ctx.entities
+         for i = 1, #entities do
+            local entity_item = entities[i]
+            entity_item.Position = { x = 0.0, y = 0.0 }
+            entity_item.Velocity = { x = 0.0, y = 0.0 }
+            entity_item.Optional = {}
+            pool:queue(entity_item)
+         end
+         pool:flush()
+      end,
+      before = create_empty_entities,
+      after = clear_pool,
+   },
+
+   remove = {
+      max_entities = 1000,
+      fn = function(ctx, _p)
+         local pool, entities = ctx.pool, ctx.entities
+         for i = 1, #entities do
+            local entity_item = entities[i]
+            entity_item.Position = nil
+            pool:queue(entity_item)
+         end
+         pool:flush()
+      end,
+      before = create_populated_pool,
+      after = clear_pool,
+   },
+
+   remove_multi = {
+      max_entities = 1000,
+      fn = function(ctx, _p)
+         local pool, entities = ctx.pool, ctx.entities
+         for i = 1, #entities do
+            local entity_item = entities[i]
+            entity_item.Position = nil
+            entity_item.Velocity = nil
+            entity_item.Optional = nil
+            pool:queue(entity_item)
+         end
+         pool:flush()
+      end,
+      before = create_populated_pool,
+      after = clear_pool,
+   },
+}
+
+-- ----------------------------------------------------------------------------
+-- System Tests
+-- ----------------------------------------------------------------------------
+
+--- @type BenchmarkTests
+local system = {
+   update = {
       max_entities = 1000,
       fn = function(ctx, _p)
          ctx.pool:emit("update", 1 / 60)
@@ -218,25 +232,25 @@ return {
          })
 
          for i = 1, p.n_entities do
-            local entity = pool:queue({
+            local entity_item = pool:queue({
                Position = { x = 0.0, y = 0.0 },
                Velocity = { x = 0.0, y = 0.0 },
             })
 
             local padding = i % 4
             if padding == 1 then
-               entity.Padding1 = {}
+               entity_item.Padding1 = {}
             elseif padding == 2 then
-               entity.Padding2 = {}
+               entity_item.Padding2 = {}
             elseif padding == 3 then
-               entity.Padding3 = {}
+               entity_item.Padding3 = {}
             end
 
             local should_shuffle = (i + 1) % 4
             if should_shuffle == 0 then
-               entity.Position = nil
+               entity_item.Position = nil
             elseif should_shuffle == 1 then
-               entity.Velocity = nil
+               entity_item.Velocity = nil
             end
          end
          pool:flush()
@@ -244,4 +258,15 @@ return {
       end,
       after = clear_pool,
    },
+}
+
+-- ----------------------------------------------------------------------------
+-- Module Export
+-- ----------------------------------------------------------------------------
+
+--- @type BenchmarkModule
+return {
+   entity = entity,
+   component = component,
+   system = system,
 }

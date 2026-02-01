@@ -121,17 +121,6 @@ local component = {
       fn = function(ctx, _p)
          local entities = ctx.entities
          for i = 1, #entities do
-            local _ = entities[i].Position
-         end
-      end,
-      before = create_populated_world,
-      after = clear_world,
-   },
-
-   get_multi = {
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
             local e = entities[i]
             local _ = e.Position
             _ = e.Velocity
@@ -146,18 +135,6 @@ local component = {
       fn = function(ctx, _p)
          local world, entities = ctx.world, ctx.entities
          for i = 1, #entities do
-            entities[i]:give("Position", 0.0, 0.0)
-         end
-         world:__flush()
-      end,
-      before = create_empty_entities,
-      after = clear_world,
-   },
-
-   add_multi = {
-      fn = function(ctx, _p)
-         local world, entities = ctx.world, ctx.entities
-         for i = 1, #entities do
             local e = entities[i]
             e:give("Position", 0.0, 0.0):give("Velocity", 0.0, 0.0):give("Optional")
          end
@@ -168,18 +145,6 @@ local component = {
    },
 
    remove = {
-      fn = function(ctx, _p)
-         local world, entities = ctx.world, ctx.entities
-         for i = 1, #entities do
-            entities[i]:remove("Position")
-         end
-         world:__flush()
-      end,
-      before = create_populated_world,
-      after = clear_world,
-   },
-
-   remove_multi = {
       fn = function(ctx, _p)
          local world, entities = ctx.world, ctx.entities
          for i = 1, #entities do

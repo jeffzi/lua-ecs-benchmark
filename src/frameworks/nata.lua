@@ -117,18 +117,6 @@ local component = {
       fn = function(ctx, _p)
          local entities = ctx.entities
          for i = 1, #entities do
-            local _ = entities[i].Position
-         end
-      end,
-      before = create_populated_pool,
-      after = clear_pool,
-   },
-
-   get_multi = {
-      max_entities = 1000,
-      fn = function(ctx, _p)
-         local entities = ctx.entities
-         for i = 1, #entities do
             local entity_item = entities[i]
             local _ = entity_item.Position
             _ = entity_item.Velocity
@@ -146,21 +134,6 @@ local component = {
          for i = 1, #entities do
             local entity_item = entities[i]
             entity_item.Position = { x = 0.0, y = 0.0 }
-            pool:queue(entity_item)
-         end
-         pool:flush()
-      end,
-      before = create_empty_entities,
-      after = clear_pool,
-   },
-
-   add_multi = {
-      max_entities = 1000,
-      fn = function(ctx, _p)
-         local pool, entities = ctx.pool, ctx.entities
-         for i = 1, #entities do
-            local entity_item = entities[i]
-            entity_item.Position = { x = 0.0, y = 0.0 }
             entity_item.Velocity = { x = 0.0, y = 0.0 }
             entity_item.Optional = {}
             pool:queue(entity_item)
@@ -172,21 +145,6 @@ local component = {
    },
 
    remove = {
-      max_entities = 1000,
-      fn = function(ctx, _p)
-         local pool, entities = ctx.pool, ctx.entities
-         for i = 1, #entities do
-            local entity_item = entities[i]
-            entity_item.Position = nil
-            pool:queue(entity_item)
-         end
-         pool:flush()
-      end,
-      before = create_populated_pool,
-      after = clear_pool,
-   },
-
-   remove_multi = {
       max_entities = 1000,
       fn = function(ctx, _p)
          local pool, entities = ctx.pool, ctx.entities

@@ -173,18 +173,6 @@ local get = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
-         local _ = entities[i]:get("Position")
-      end
-   end,
-   before = create_populated_engine,
-   after = clear_engine,
-}
-
---- @type BenchmarkSpec
-local get_multi = {
-   fn = function(ctx, _p)
-      local entities = ctx.entities
-      for i = 1, #entities do
          local e = entities[i]
          local _ = e:get("Position")
          _ = e:get("Velocity")
@@ -196,31 +184,7 @@ local get_multi = {
 }
 
 --- @type BenchmarkSpec
-local add = {
-   fn = function(ctx, _p)
-      local entities = ctx.entities
-      for i = 1, #entities do
-         entities[i]:add(Position(0, 0))
-      end
-   end,
-   before = create_empty_entities,
-   after = clear_engine,
-}
-
---- @type BenchmarkSpec
 local remove = {
-   fn = function(ctx, _p)
-      local entities = ctx.entities
-      for i = 1, #entities do
-         entities[i]:remove("Position")
-      end
-   end,
-   before = create_populated_engine,
-   after = clear_engine,
-}
-
---- @type BenchmarkSpec
-local remove_multi = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
@@ -235,7 +199,7 @@ local remove_multi = {
 }
 
 --- @type BenchmarkSpec
-local nobatch_add_multi = {
+local nobatch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
@@ -250,7 +214,7 @@ local nobatch_add_multi = {
 }
 
 --- @type BenchmarkSpec
-local batch_add_multi = {
+local batch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
@@ -289,10 +253,7 @@ return {
          },
          component = {
             get = get,
-            get_multi = get_multi,
-            add = add,
             remove = remove,
-            remove_multi = remove_multi,
          },
          system = {
             update = update,
@@ -300,12 +261,12 @@ return {
       },
       ["lovetoys-nobatch"] = {
          component = {
-            add_multi = nobatch_add_multi,
+            add = nobatch_add,
          },
       },
       ["lovetoys-batch"] = {
          component = {
-            add_multi = batch_add_multi,
+            add = batch_add,
          },
       },
    },

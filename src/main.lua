@@ -11,10 +11,7 @@ local ENTITY_COUNTS = { 10, 100, 1000, 10000 }
 
 local GROUPS = {
    { name = "entity", tests = { "create_empty", "create_with_components", "destroy" } },
-   {
-      name = "component",
-      tests = { "get", "get_multi", "add", "add_multi", "remove", "remove_multi" },
-   },
+   { name = "component", tests = { "get", "add", "remove" } },
    { name = "system", tests = { "update" } },
 }
 

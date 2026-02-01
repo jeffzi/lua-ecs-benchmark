@@ -192,43 +192,7 @@ local batch_create_with_components = {
 -- ----------------------------------------------------------------------------
 
 --- @type BenchmarkSpec
-local get = {
-   fn = function(ctx, _p)
-      local entities = ctx.entities
-      for i = 1, #entities do
-         local _ = entities[i][Position]
-      end
-   end,
-   before = create_populated_world,
-   after = destroy_world,
-}
-
---- @type BenchmarkSpec
-local add = {
-   fn = function(ctx, _p)
-      local entities = ctx.entities
-      for i = 1, #entities do
-         entities[i][Position] = Position({ x = 0.0, y = 0.0 })
-      end
-   end,
-   before = create_empty_entities,
-   after = destroy_world,
-}
-
---- @type BenchmarkSpec
-local remove = {
-   fn = function(ctx, _p)
-      local entities = ctx.entities
-      for i = 1, #entities do
-         entities[i]:Unset(Position)
-      end
-   end,
-   before = create_populated_world,
-   after = destroy_world,
-}
-
---- @type BenchmarkSpec
-local nobatch_get_multi = {
+local nobatch_get = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
@@ -243,7 +207,7 @@ local nobatch_get_multi = {
 }
 
 --- @type BenchmarkSpec
-local nobatch_add_multi = {
+local nobatch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
@@ -258,7 +222,7 @@ local nobatch_add_multi = {
 }
 
 --- @type BenchmarkSpec
-local nobatch_remove_multi = {
+local nobatch_remove = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
@@ -273,7 +237,7 @@ local nobatch_remove_multi = {
 }
 
 --- @type BenchmarkSpec
-local batch_get_multi = {
+local batch_get = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
@@ -285,7 +249,7 @@ local batch_get_multi = {
 }
 
 --- @type BenchmarkSpec
-local batch_add_multi = {
+local batch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
@@ -297,7 +261,7 @@ local batch_add_multi = {
 }
 
 --- @type BenchmarkSpec
-local batch_remove_multi = {
+local batch_remove = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
@@ -335,11 +299,6 @@ return {
             create_empty = create_empty,
             destroy = destroy,
          },
-         component = {
-            get = get,
-            add = add,
-            remove = remove,
-         },
          system = {
             update = update,
          },
@@ -349,9 +308,9 @@ return {
             create_with_components = nobatch_create_with_components,
          },
          component = {
-            get_multi = nobatch_get_multi,
-            add_multi = nobatch_add_multi,
-            remove_multi = nobatch_remove_multi,
+            get = nobatch_get,
+            add = nobatch_add,
+            remove = nobatch_remove,
          },
       },
       ["ecs-lua-batch"] = {
@@ -359,9 +318,9 @@ return {
             create_with_components = batch_create_with_components,
          },
          component = {
-            get_multi = batch_get_multi,
-            add_multi = batch_add_multi,
-            remove_multi = batch_remove_multi,
+            get = batch_get,
+            add = batch_add,
+            remove = batch_remove,
          },
       },
    },

@@ -18,6 +18,10 @@
 --- @field remove? BenchmarkSpec
 --- @field remove_multi? BenchmarkSpec
 --- @field update? BenchmarkSpec
+--- @field component_medium? BenchmarkSpec
+--- @field component_large? BenchmarkSpec
+--- @field archetype_churn? BenchmarkSpec
+--- @field archetype_thrash? BenchmarkSpec
 
 --- @class BenchmarkGroup
 --- @field name string Group name (e.g., "entity", "component", "system").
@@ -27,6 +31,7 @@
 --- @field entity? BenchmarkTests
 --- @field component? BenchmarkTests
 --- @field system? BenchmarkTests
+--- @field stress? BenchmarkTests
 
 --- Module that exports tests directly (grouped by category).
 --- @alias BenchmarkModule GroupedBenchmarkTests

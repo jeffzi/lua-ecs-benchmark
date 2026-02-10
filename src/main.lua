@@ -1,5 +1,6 @@
 local Progress = require("src.lib.progress")
 local argparse = require("argparse")
+local config = require("src.lib.config")
 local luamark = require("luamark")
 local utils = require("src.lib.utils")
 
@@ -7,12 +8,16 @@ local utils = require("src.lib.utils")
 -- Configuration
 -- ----------------------------------------------------------------------------
 
-local ENTITY_COUNTS = { 10, 100, 1000, 10000 }
+local ENTITY_COUNTS = config.ENTITY_COUNTS
 
 local GROUPS = {
    { name = "entity", tests = { "create_empty", "create_with_components", "destroy" } },
-   { name = "component", tests = { "get", "add", "remove" } },
-   { name = "system", tests = { "update" } },
+   { name = "component", tests = { "get", "set", "add", "remove" } },
+   {
+      name = "system",
+      tests = { "throughput", "overlap", "fragmented", "chained", "multi_20", "empty_systems" },
+   },
+   { name = "stress", tests = { "archetype_churn" } },
 }
 
 local HEADERS = {
@@ -230,9 +235,13 @@ local function main(output, framework_names, group_filter, test_filter, entity_c
                group_by_entity_limit(framework_names, group_name, test_name, max_count)
 
             local full_name = group_name .. "/" .. test_name
+            local reported = {}
             local function on_benchmark(label)
-               progress_count = progress_count + 1
-               bar:update(progress_count, string.format("%s (%s)", full_name, label))
+               if not reported[label] then
+                  reported[label] = true
+                  progress_count = progress_count + 1
+                  bar:update(progress_count, string.format("%s (%s)", full_name, label))
+               end
             end
 
             -- Run unlimited frameworks first (all entity counts)

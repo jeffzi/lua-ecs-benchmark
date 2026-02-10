@@ -2,6 +2,10 @@ local math_random = math.random
 
 local utils = {}
 
+-- Lua 5.1/5.2+ compatibility (unpack is global in 5.1, table.unpack in 5.2+)
+---@diagnostic disable-next-line: deprecated
+utils.unpack = rawget(_G, "unpack") or table.unpack -- luacheck: ignore 143
+
 local PATH_SEP = package.config:sub(1, 1)
 
 --- Shuffle array elements in place using Fisher-Yates algorithm.

@@ -13,6 +13,7 @@
 
 ---@diagnostic disable: unused-local
 local ECS = require("lib.ecs-lua.ECS")
+local config = require("src.lib.config")
 local shuffle = require("src.lib.utils").shuffle
 
 local ecs_Component = ECS.Component
@@ -20,107 +21,82 @@ local ecs_System = ECS.System
 local ecs_Query = ECS.Query
 local ecs_World = ECS.World
 
+local DT = config.DT
+local WORLD_MULTIPLIER = config.WORLD_MULTIPLIER
+
 -- ----------------------------------------------------------------------------
 -- Setup
 -- ----------------------------------------------------------------------------
 
 local Position = ecs_Component({ x = 0.0, y = 0.0 })
 local Velocity = ecs_Component({ x = 0.0, y = 0.0 })
-local Optional = ecs_Component()
-local Padding1 = ecs_Component()
-local Padding2 = ecs_Component()
-local Padding3 = ecs_Component()
+local Health = ecs_Component({ current = 100, max = 100 })
+local Name = ecs_Component({ value = "" })
+local Aggro = ecs_Component()
+local Alive = ecs_Component()
 
-local DT = 1000 / 60 / 1000
+local A = ecs_Component({ v = 0 })
+local B = ecs_Component({ v = 0 })
+local C = ecs_Component({ v = 0 })
+local D = ecs_Component({ v = 0 })
+local E = ecs_Component({ v = 0 })
 
---- Create a new ECS world with timing info.
---- @return { world: table, timestep: number, dt: number } Context with world and timing.
-local function create_world()
-   return { world = ecs_World(nil, 60, false), timestep = 1, dt = DT }
+-- Components for multi-system tests (Comp1-Comp10)
+local Comp1 = ecs_Component({ value = 0 })
+local Comp2 = ecs_Component({ value = 0 })
+local Comp3 = ecs_Component({ value = 0 })
+local Comp4 = ecs_Component({ value = 0 })
+local Comp5 = ecs_Component({ value = 0 })
+local Comp6 = ecs_Component({ value = 0 })
+local Comp7 = ecs_Component({ value = 0 })
+local Comp8 = ecs_Component({ value = 0 })
+local Comp9 = ecs_Component({ value = 0 })
+local Comp10 = ecs_Component({ value = 0 })
+
+local NonExistent = ecs_Component({ value = 0 })
+
+-- Buff components for archetype fragmentation tests
+local BUFFS = {}
+for _ = 1, config.N_BUFFS do
+   BUFFS[#BUFFS + 1] = ecs_Component({ level = 0 })
 end
 
---- Create a world populated with entities (with components).
---- @param _ctx table Unused previous context.
---- @param p { n_entities: number } Benchmark parameters.
---- @return { world: table, entities: table[], timestep: number, dt: number } Context.
-local function create_populated_world(_ctx, p)
-   local world = ecs_World(nil, 60, false)
-   local entities = {}
-   for i = 1, p.n_entities do
-      entities[i] =
-         world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }), Optional())
-   end
-   world:Update("process", DT) -- Make entities alive
-   shuffle(entities)
-   return { world = world, entities = entities, timestep = 1, dt = DT }
+local function make_default_entity(world)
+   return world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }), Alive())
 end
 
---- Create a world populated with empty entities.
---- @param _ctx table Unused previous context.
---- @param p { n_entities: number } Benchmark parameters.
---- @return { world: table, entities: table[], timestep: number, dt: number } Context.
-local function create_empty_entities(_ctx, p)
-   local world = ecs_World(nil, 60, false)
-   local entities = {}
-   for i = 1, p.n_entities do
-      entities[i] = world:Entity()
+--- Factory: returns a `before` function that creates a populated world.
+--- (WORLD_MULTIPLIER - 1) * N background + N tracked entities.
+--- @param make_entity? fun(world: table): table Factory for tracked entities.
+--- @return fun(_ctx: table, p: { n_entities: number }): { world: table, entities: table[], timestep: number, dt: number }
+local function create_world(make_entity)
+   make_entity = make_entity or make_default_entity
+   return function(_ctx, p)
+      local world = ecs_World(nil, 60, false)
+
+      -- Background entities
+      for _ = 1, p.n_entities * (WORLD_MULTIPLIER - 1) do
+         world:Entity(Health({ current = 100, max = 100 }), Name({ value = "monster" }), Aggro())
+      end
+
+      -- Tracked entities for test operations
+      local entities = {}
+      for i = 1, p.n_entities do
+         entities[i] = make_entity(world)
+      end
+
+      world:Update("process", DT)
+      shuffle(entities)
+      return { world = world, entities = entities, timestep = 1, dt = DT }
    end
-   world:Update("process", DT) -- Make entities alive
-   shuffle(entities)
-   return { world = world, entities = entities, timestep = 1, dt = DT }
 end
 
 --- Destroy the world.
 --- @param ctx { world: table } Context with world.
 local function destroy_world(ctx)
    ctx.world:Destroy()
-end
-
---- Create system_update before function.
---- @param _ctx table Unused previous context.
---- @param p { n_entities: number } Benchmark parameters.
---- @return { world: table, timestep: number, dt: number } Context.
-local function create_system_world(_ctx, p)
-   local world = ecs_World(nil, 60, false)
-
-   for i = 1, p.n_entities do
-      local e = world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }))
-
-      local padding = i % 4
-      if padding == 1 then
-         e.Padding1 = Padding1()
-      elseif padding == 2 then
-         e.Padding2 = Padding2()
-      elseif padding == 3 then
-         e.Padding3 = Padding3()
-      end
-
-      local should_shuffle = (i + 1) % 4
-      if should_shuffle == 0 then
-         e:Unset(Position)
-      elseif should_shuffle == 1 then
-         e:Unset(Velocity)
-      end
-   end
-
-   ---@diagnostic disable-next-line: redefined-local
-   local MovementSystem = ecs_System(
-      "process",
-      1,
-      ecs_Query.All(Position, Velocity),
-      function(self, Time)
-         local dt = Time.DeltaFixed
-         self:Result():ForEach(function(e)
-            local position = e[Position]
-            local velocity = e[Velocity]
-            position.x = position.x + velocity.x * dt
-            position.y = position.y + velocity.y * dt
-         end)
-      end
-   )
-
-   world:AddSystem(MovementSystem)
-   return { world = world, timestep = 1, dt = DT }
+   ctx.world = nil
+   ctx.entities = nil
 end
 
 -- ----------------------------------------------------------------------------
@@ -138,7 +114,7 @@ local create_empty = {
       world:Update("process", timestep * ctx.dt)
       ctx.timestep = timestep
    end,
-   before = create_world,
+   before = create_world(),
    after = destroy_world,
 }
 
@@ -146,12 +122,14 @@ local create_empty = {
 local destroy = {
    fn = function(ctx, _p)
       local world, entities = ctx.world, ctx.entities
+      local timestep = ctx.timestep + 1
       for i = 1, #entities do
          world:Remove(entities[i])
       end
-      world:Update("process", ctx.timestep * ctx.dt)
+      world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
    end,
-   before = create_populated_world,
+   before = create_world(),
    after = destroy_world,
 }
 
@@ -162,13 +140,13 @@ local nobatch_create_with_components = {
       local timestep = ctx.timestep + 1
       for _ = 1, p.n_entities do
          local e = world:Entity()
-         e[Position] = Position({ x = 0.0, y = 0.0 })
-         e[Velocity] = Velocity({ x = 0.0, y = 0.0 })
+         e[Position] = Position({ x = 0, y = 0 })
+         e[Alive] = Alive()
       end
       world:Update("process", timestep * ctx.dt)
       ctx.timestep = timestep
    end,
-   before = create_world,
+   before = create_world(),
    after = destroy_world,
 }
 
@@ -178,12 +156,12 @@ local batch_create_with_components = {
       local world = ctx.world
       local timestep = ctx.timestep + 1
       for _ = 1, p.n_entities do
-         world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }))
+         world:Entity(Position({ x = 0, y = 0 }), Alive())
       end
       world:Update("process", timestep * ctx.dt)
       ctx.timestep = timestep
    end,
-   before = create_world,
+   before = create_world(),
    after = destroy_world,
 }
 
@@ -192,17 +170,42 @@ local batch_create_with_components = {
 -- ----------------------------------------------------------------------------
 
 --- @type BenchmarkSpec
-local nobatch_get = {
+local get = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
-         local e = entities[i]
-         local _ = e[Position]
-         _ = e[Velocity]
-         _ = e[Optional]
+         local pos = entities[i][Position]
+         local _ = pos.x
+         local _ = pos.y
       end
    end,
-   before = create_populated_world,
+   before = create_world(),
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local set = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         local pos = entities[i][Position]
+         pos.x = 1.0
+         pos.y = 1.0
+      end
+   end,
+   before = create_world(),
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local remove = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i]:Unset(Velocity)
+      end
+   end,
+   before = create_world(),
    after = destroy_world,
 }
 
@@ -211,40 +214,10 @@ local nobatch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
-         local e = entities[i]
-         e[Position] = Position({ x = 0.0, y = 0.0 })
-         e[Velocity] = Velocity({ x = 0.0, y = 0.0 })
-         e[Optional] = Optional()
+         entities[i][Name] = Name({ value = "monster" })
       end
    end,
-   before = create_empty_entities,
-   after = destroy_world,
-}
-
---- @type BenchmarkSpec
-local nobatch_remove = {
-   fn = function(ctx, _p)
-      local entities = ctx.entities
-      for i = 1, #entities do
-         local e = entities[i]
-         e:Unset(Position)
-         e:Unset(Velocity)
-         e:Unset(Optional)
-      end
-   end,
-   before = create_populated_world,
-   after = destroy_world,
-}
-
---- @type BenchmarkSpec
-local batch_get = {
-   fn = function(ctx, _p)
-      local entities = ctx.entities
-      for i = 1, #entities do
-         local _ = entities[i]:Get(Position, Velocity, Optional)
-      end
-   end,
-   before = create_populated_world,
+   before = create_world(),
    after = destroy_world,
 }
 
@@ -253,22 +226,62 @@ local batch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
-         entities[i]:Set(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }), Optional())
+         entities[i]:Set(Name({ value = "monster" }))
       end
    end,
-   before = create_empty_entities,
+   before = create_world(),
+   after = destroy_world,
+}
+
+-- ----------------------------------------------------------------------------
+-- Tag Tests
+-- ----------------------------------------------------------------------------
+
+--- @type BenchmarkSpec
+local has = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         local _ = entities[i][Alive] ~= nil
+      end
+   end,
+   before = create_world(),
    after = destroy_world,
 }
 
 --- @type BenchmarkSpec
-local batch_remove = {
+local tag_remove = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
-         entities[i]:Unset(Position, Velocity, Optional)
+         entities[i]:Unset(Alive)
       end
    end,
-   before = create_populated_world,
+   before = create_world(),
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local nobatch_tag_add = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i][Aggro] = Aggro()
+      end
+   end,
+   before = create_world(),
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local batch_tag_add = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i]:Set(Aggro())
+      end
+   end,
+   before = create_world(),
    after = destroy_world,
 }
 
@@ -277,13 +290,266 @@ local batch_remove = {
 -- ----------------------------------------------------------------------------
 
 --- @type BenchmarkSpec
-local update = {
+local throughput = {
    fn = function(ctx, _p)
       local timestep = ctx.timestep + 1
       ctx.world:Update("process", timestep * ctx.dt)
       ctx.timestep = timestep
    end,
-   before = create_system_world,
+   before = function(_ctx, p)
+      local world = ecs_World(nil, 60, false)
+
+      for _ = 1, p.n_entities do
+         world:Entity(Position({ x = 0.0, y = 0.0 }), Velocity({ x = 0.0, y = 0.0 }))
+      end
+
+      local MovementSystem = ecs_System(
+         "process",
+         1,
+         ecs_Query.All(Position, Velocity),
+         function(self, Time)
+            local dt = Time.DeltaFixed
+            self:Result():ForEach(function(e)
+               local position = e[Position]
+               local velocity = e[Velocity]
+               position.x = position.x + velocity.x * dt
+               position.y = position.y + velocity.y * dt
+            end)
+         end
+      )
+
+      world:AddSystem(MovementSystem)
+      world:Update("process", DT)
+      return { world = world, timestep = 1, dt = DT }
+   end,
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local overlap = {
+   fn = function(ctx, _p)
+      local timestep = ctx.timestep + 1
+      ctx.world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = function(_ctx, p)
+      local world = ecs_World(nil, 60, false)
+
+      for i = 1, p.n_entities do
+         local archetype = i % 4
+         local e = world:Entity(A({ v = 0 }), B({ v = 0 }))
+         if archetype >= 1 then
+            e[C] = C({ v = 0 })
+         end
+         if archetype >= 2 then
+            e[D] = D({ v = 0 })
+         end
+         if archetype == 3 then
+            e:Unset(D)
+            e[E] = E({ v = 0 })
+         end
+      end
+
+      local SwapAB = ecs_System("process", 1, ecs_Query.All(A, B), function(self, _Time)
+         self:Result():ForEach(function(e)
+            e[A].v, e[B].v = e[B].v, e[A].v
+         end)
+      end)
+
+      local SwapCD = ecs_System("process", 2, ecs_Query.All(C, D), function(self, _Time)
+         self:Result():ForEach(function(e)
+            e[C].v, e[D].v = e[D].v, e[C].v
+         end)
+      end)
+
+      local SwapCE = ecs_System("process", 3, ecs_Query.All(C, E), function(self, _Time)
+         self:Result():ForEach(function(e)
+            e[C].v, e[E].v = e[E].v, e[C].v
+         end)
+      end)
+
+      world:AddSystem(SwapAB)
+      world:AddSystem(SwapCD)
+      world:AddSystem(SwapCE)
+      world:Update("process", DT)
+
+      return { world = world, timestep = 1, dt = DT }
+   end,
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local fragmented = {
+   fn = function(ctx, _p)
+      local timestep = ctx.timestep + 1
+      ctx.world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = function(_ctx, p)
+      local world = ecs_World(nil, 60, false)
+
+      for i = 1, p.n_entities do
+         local buff_index = ((i - 1) % #BUFFS) + 1
+         local e = world:Entity(Position({ x = 0.0, y = 0.0 }))
+         e[BUFFS[buff_index]] = BUFFS[buff_index]({ level = buff_index })
+      end
+
+      local sum = 0
+
+      local PositionSystem = ecs_System("process", 1, ecs_Query.All(Position), function(self, _Time)
+         self:Result():ForEach(function(e)
+            local pos = e[Position]
+            sum = sum + pos.x + pos.y
+         end)
+      end)
+
+      local Buff1System = ecs_System("process", 2, ecs_Query.All(BUFFS[1]), function(self, _Time)
+         self:Result():ForEach(function(e)
+            sum = sum + e[BUFFS[1]].level
+         end)
+      end)
+
+      world:AddSystem(PositionSystem)
+      world:AddSystem(Buff1System)
+      world:Update("process", DT)
+      return { world = world, timestep = 1, dt = DT }
+   end,
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local chained = {
+   fn = function(ctx, _p)
+      local timestep = ctx.timestep + 1
+      ctx.world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = function(_ctx, p)
+      local world = ecs_World(nil, 60, false)
+
+      for _ = 1, p.n_entities do
+         world:Entity(A({ v = 1 }), B({ v = 0 }), C({ v = 0 }), D({ v = 0 }), E({ v = 0 }))
+      end
+
+      local SysAB = ecs_System("process", 1, ecs_Query.All(A, B), function(self, _Time)
+         self:Result():ForEach(function(e)
+            e[B].v = e[A].v
+         end)
+      end)
+
+      local SysBC = ecs_System("process", 2, ecs_Query.All(B, C), function(self, _Time)
+         self:Result():ForEach(function(e)
+            e[C].v = e[B].v
+         end)
+      end)
+
+      local SysCD = ecs_System("process", 3, ecs_Query.All(C, D), function(self, _Time)
+         self:Result():ForEach(function(e)
+            e[D].v = e[C].v
+         end)
+      end)
+
+      local SysDE = ecs_System("process", 4, ecs_Query.All(D, E), function(self, _Time)
+         self:Result():ForEach(function(e)
+            e[E].v = e[D].v
+         end)
+      end)
+
+      world:AddSystem(SysAB)
+      world:AddSystem(SysBC)
+      world:AddSystem(SysCD)
+      world:AddSystem(SysDE)
+      world:Update("process", DT)
+
+      return { world = world, timestep = 1, dt = DT }
+   end,
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local multi_20 = {
+   fn = function(ctx, _p)
+      local timestep = ctx.timestep + 1
+      ctx.world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = function(_ctx, p)
+      local world = ecs_World(nil, 60, false)
+
+      for _ = 1, p.n_entities do
+         world:Entity(
+            Comp1({ value = 0 }),
+            Comp2({ value = 0 }),
+            Comp3({ value = 0 }),
+            Comp4({ value = 0 }),
+            Comp5({ value = 0 }),
+            Comp6({ value = 0 }),
+            Comp7({ value = 0 }),
+            Comp8({ value = 0 }),
+            Comp9({ value = 0 }),
+            Comp10({ value = 0 })
+         )
+      end
+
+      local comps = { Comp1, Comp2, Comp3, Comp4, Comp5, Comp6, Comp7, Comp8, Comp9, Comp10 }
+      local sum = 0
+      local priority = 1
+
+      for _, comp in ipairs(comps) do
+         local sys1 = ecs_System("process", priority, ecs_Query.All(comp), function(self, _Time)
+            local c = self.comp
+            self:Result():ForEach(function(e)
+               sum = sum + e[c].value
+            end)
+         end)
+         sys1.comp = comp
+         world:AddSystem(sys1)
+         priority = priority + 1
+
+         local sys2 = ecs_System("process", priority, ecs_Query.All(comp), function(self, _Time)
+            local c = self.comp
+            self:Result():ForEach(function(e)
+               sum = sum + e[c].value
+            end)
+         end)
+         sys2.comp = comp
+         world:AddSystem(sys2)
+         priority = priority + 1
+      end
+
+      world:Update("process", DT)
+      return { world = world, timestep = 1, dt = DT }
+   end,
+   after = destroy_world,
+}
+
+--- @type BenchmarkSpec
+local empty_systems = {
+   fn = function(ctx, _p)
+      local timestep = ctx.timestep + 1
+      ctx.world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = function(_ctx, p)
+      local world = ecs_World(nil, 60, false)
+
+      for _ = 1, p.n_entities do
+         world:Entity(Position({ x = 0.0, y = 0.0 }))
+      end
+
+      for i = 1, 20 do
+         local sys = ecs_System("process", i, ecs_Query.All(NonExistent), function(self, Time)
+            local dt = Time.DeltaFixed
+            self:Result():ForEach(function(e)
+               e[NonExistent].value = e[NonExistent].value + dt
+            end)
+         end)
+         world:AddSystem(sys)
+      end
+
+      world:Update("process", DT)
+      return { world = world, timestep = 1, dt = DT }
+   end,
    after = destroy_world,
 }
 
@@ -299,8 +565,22 @@ return {
             create_empty = create_empty,
             destroy = destroy,
          },
+         component = {
+            get = get,
+            set = set,
+            remove = remove,
+         },
+         tag = {
+            has = has,
+            remove = tag_remove,
+         },
          system = {
-            update = update,
+            throughput = throughput,
+            overlap = overlap,
+            fragmented = fragmented,
+            chained = chained,
+            multi_20 = multi_20,
+            empty_systems = empty_systems,
          },
       },
       ["ecs-lua-nobatch"] = {
@@ -308,9 +588,10 @@ return {
             create_with_components = nobatch_create_with_components,
          },
          component = {
-            get = nobatch_get,
             add = nobatch_add,
-            remove = nobatch_remove,
+         },
+         tag = {
+            add = nobatch_tag_add,
          },
       },
       ["ecs-lua-batch"] = {
@@ -318,9 +599,10 @@ return {
             create_with_components = batch_create_with_components,
          },
          component = {
-            get = batch_get,
             add = batch_add,
-            remove = batch_remove,
+         },
+         tag = {
+            add = batch_tag_add,
          },
       },
    },

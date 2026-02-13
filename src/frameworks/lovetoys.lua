@@ -1,4 +1,5 @@
 ---@diagnostic disable: unused-local
+local config = require("src.lib.config")
 local lovetoys = require("lovetoys")
 local shuffle = require("src.lib.utils").shuffle
 
@@ -9,113 +10,90 @@ local lt_Engine = lovetoys.Engine
 local lt_Entity = lovetoys.Entity
 local lt_System = lovetoys.System
 
+local DT = config.DT
+local WORLD_MULTIPLIER = config.WORLD_MULTIPLIER
+
 -- ----------------------------------------------------------------------------
 -- Setup
 -- ----------------------------------------------------------------------------
 
 local Position = lt_Component.create("Position", { "x", "y" }, { x = 0, y = 0 })
 local Velocity = lt_Component.create("Velocity", { "x", "y" }, { x = 0, y = 0 })
-local Optional = lt_Component.create("Optional")
-local Padding1 = lt_Component.create("Padding1")
-local Padding2 = lt_Component.create("Padding2")
-local Padding3 = lt_Component.create("Padding3")
+local Health = lt_Component.create("Health", { "current", "max" }, { current = 100, max = 100 })
+local Name = lt_Component.create("Name", { "value" }, { value = "" })
+local Aggro = lt_Component.create("Aggro")
+local Alive = lt_Component.create("Alive")
 
---- Create a new engine.
---- @return { engine: table } Context with engine.
-local function create_engine()
-   return { engine = lt_Engine() }
+local A = lt_Component.create("A", { "v" }, { v = 0 })
+local B = lt_Component.create("B", { "v" }, { v = 0 })
+local C = lt_Component.create("C", { "v" }, { v = 0 })
+local D = lt_Component.create("D", { "v" }, { v = 0 })
+local E = lt_Component.create("E", { "v" }, { v = 0 })
+
+-- Components for multi-system tests (Comp1-Comp10)
+local Comp1 = lt_Component.create("Comp1", { "value" }, { value = 0 })
+local Comp2 = lt_Component.create("Comp2", { "value" }, { value = 0 })
+local Comp3 = lt_Component.create("Comp3", { "value" }, { value = 0 })
+local Comp4 = lt_Component.create("Comp4", { "value" }, { value = 0 })
+local Comp5 = lt_Component.create("Comp5", { "value" }, { value = 0 })
+local Comp6 = lt_Component.create("Comp6", { "value" }, { value = 0 })
+local Comp7 = lt_Component.create("Comp7", { "value" }, { value = 0 })
+local Comp8 = lt_Component.create("Comp8", { "value" }, { value = 0 })
+local Comp9 = lt_Component.create("Comp9", { "value" }, { value = 0 })
+local Comp10 = lt_Component.create("Comp10", { "value" }, { value = 0 })
+
+lt_Component.create("NonExistent", { "value" }, { value = 0 })
+
+local BUFFS = {}
+for i, name in ipairs(config.generate_buff_names(config.N_BUFFS)) do
+   BUFFS[i] = lt_Component.create(name, { "level" }, { level = 0 })
 end
 
---- Create an engine populated with entities (with components).
---- @param _ctx table Unused previous context.
---- @param p { n_entities: number } Benchmark parameters.
---- @return { engine: table, entities: table[] } Context with engine and entities.
-local function create_populated_engine(_ctx, p)
-   local engine = lt_Engine()
-   local entities = {}
-   for i = 1, p.n_entities do
-      local e = lt_Entity()
-      e:initialize()
-      e:add(Position(0, 0))
-      e:add(Velocity(0, 0))
-      e:add(Optional())
-      engine:addEntity(e)
-      entities[i] = e
+local function make_default_entity(engine)
+   local e = lt_Entity()
+   e:initialize()
+   e:add(Position(0, 0))
+   e:add(Velocity(0, 0))
+   e:add(Alive())
+   engine:addEntity(e)
+   return e
+end
+
+--- Factory: returns a `before` function that creates a populated engine.
+--- (WORLD_MULTIPLIER - 1) * N background + N tracked entities.
+--- @param make_entity? fun(engine: table): table Factory for tracked entities.
+--- @return fun(_ctx: table, p: { n_entities: number }): { engine: table, entities: table[] }
+local function create_world(make_entity)
+   make_entity = make_entity or make_default_entity
+   return function(_ctx, p)
+      local engine = lt_Engine()
+
+      -- Background entities
+      for _ = 1, p.n_entities * (WORLD_MULTIPLIER - 1) do
+         local e = lt_Entity()
+         e:initialize()
+         e:add(Health(100, 100))
+         e:add(Name("monster"))
+         e:add(Aggro())
+         engine:addEntity(e)
+      end
+
+      -- Tracked entities for test operations
+      local entities = {}
+      for i = 1, p.n_entities do
+         entities[i] = make_entity(engine)
+      end
+
+      shuffle(entities)
+      return { engine = engine, entities = entities }
    end
-   shuffle(entities)
-   return { engine = engine, entities = entities }
 end
 
---- Create an engine populated with empty entities.
---- @param _ctx table Unused previous context.
---- @param p { n_entities: number } Benchmark parameters.
---- @return { engine: table, entities: table[] } Context with engine and entities.
-local function create_empty_entities(_ctx, p)
-   local engine = lt_Engine()
-   local entities = {}
-   for i = 1, p.n_entities do
-      local e = lt_Entity()
-      e:initialize()
-      engine:addEntity(e)
-      entities[i] = e
-   end
-   shuffle(entities)
-   return { engine = engine, entities = entities }
-end
-
---- Clear the engine (no-op, just nil out for GC).
+--- Clear the engine.
 --- @param ctx { engine: table } Context with engine.
 local function clear_engine(ctx)
    ctx.engine = nil
-end
-
---- Create system_update before function.
---- @param _ctx table Unused previous context.
---- @param p { n_entities: number } Benchmark parameters.
---- @return { engine: table } Context with engine.
-local function create_system_engine(_ctx, p)
-   local engine = lt_Engine()
-   for i = 1, p.n_entities do
-      local e = lt_Entity()
-      e:initialize()
-      e:add(Position(0, 0))
-      e:add(Velocity(0, 0))
-      engine:addEntity(e)
-
-      local padding = i % 4
-      if padding == 1 then
-         e:add(Padding1())
-      elseif padding == 2 then
-         e:add(Padding2())
-      elseif padding == 3 then
-         e:add(Padding3())
-      end
-
-      local should_shuffle = (i + 1) % 4
-      if should_shuffle == 0 then
-         e:remove("Position")
-      elseif should_shuffle == 1 then
-         e:remove("Velocity")
-      end
-   end
-
-   local MovementSystem = lt_class("MovementSystem", lt_System)
-
-   function MovementSystem:requires()
-      return { "Position", "Velocity" }
-   end
-
-   function MovementSystem:update(dt)
-      for _, e in pairs(self.targets) do
-         local position = e:get("Position")
-         local velocity = e:get("Velocity")
-         position.x = position.x + velocity.x * dt
-         position.y = position.y + velocity.y * dt
-      end
-   end
-
-   engine:addSystem(MovementSystem())
-   return { engine = engine }
+   ctx.entities = nil
 end
 
 -- ----------------------------------------------------------------------------
@@ -132,7 +110,7 @@ local create_empty = {
          engine:addEntity(e)
       end
    end,
-   before = create_engine,
+   before = create_world(),
    after = clear_engine,
 }
 
@@ -144,11 +122,11 @@ local create_with_components = {
          local e = lt_Entity()
          e:initialize()
          e:add(Position(0, 0))
-         e:add(Velocity(0, 0))
+         e:add(Alive())
          engine:addEntity(e)
       end
    end,
-   before = create_engine,
+   before = create_world(),
    after = clear_engine,
 }
 
@@ -160,7 +138,7 @@ local destroy = {
          engine:removeEntity(entities[i])
       end
    end,
-   before = create_populated_engine,
+   before = create_world(),
    after = clear_engine,
 }
 
@@ -173,13 +151,26 @@ local get = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
-         local e = entities[i]
-         local _ = e:get("Position")
-         _ = e:get("Velocity")
-         _ = e:get("Optional")
+         local pos = entities[i]:get("Position")
+         local _ = pos.x
+         local _ = pos.y
       end
    end,
-   before = create_populated_engine,
+   before = create_world(),
+   after = clear_engine,
+}
+
+--- @type BenchmarkSpec
+local set = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         local pos = entities[i]:get("Position")
+         pos.x = 1.0
+         pos.y = 1.0
+      end
+   end,
+   before = create_world(),
    after = clear_engine,
 }
 
@@ -188,13 +179,10 @@ local remove = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
-         local e = entities[i]
-         e:remove("Position")
-         e:remove("Velocity")
-         e:remove("Optional")
+         entities[i]:remove("Velocity")
       end
    end,
-   before = create_populated_engine,
+   before = create_world(),
    after = clear_engine,
 }
 
@@ -203,25 +191,76 @@ local nobatch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
-         local e = entities[i]
-         e:add(Position(0, 0))
-         e:add(Velocity(0, 0))
-         e:add(Optional())
+         entities[i]:add(Name("monster"))
       end
    end,
-   before = create_empty_entities,
+   before = create_world(),
    after = clear_engine,
 }
 
+-- NOTE: addMultiple internally loops individual add() calls, firing a
+-- ComponentAdded event per component. No true batching benefit.
 --- @type BenchmarkSpec
 local batch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
       for i = 1, #entities do
-         entities[i]:addMultiple({ Position(0, 0), Velocity(0, 0), Optional() })
+         entities[i]:addMultiple({ Name("monster") })
       end
    end,
-   before = create_empty_entities,
+   before = create_world(),
+   after = clear_engine,
+}
+
+-- ----------------------------------------------------------------------------
+-- Tag Tests
+-- ----------------------------------------------------------------------------
+
+--- @type BenchmarkSpec
+local has = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         local _ = entities[i].components["Alive"] ~= nil
+      end
+   end,
+   before = create_world(),
+   after = clear_engine,
+}
+
+--- @type BenchmarkSpec
+local nobatch_tag_add = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i]:add(Aggro())
+      end
+   end,
+   before = create_world(),
+   after = clear_engine,
+}
+
+--- @type BenchmarkSpec
+local batch_tag_add = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i]:addMultiple({ Aggro() })
+      end
+   end,
+   before = create_world(),
+   after = clear_engine,
+}
+
+--- @type BenchmarkSpec
+local tag_remove = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i]:remove("Alive")
+      end
+   end,
+   before = create_world(),
    after = clear_engine,
 }
 
@@ -230,11 +269,336 @@ local batch_add = {
 -- ----------------------------------------------------------------------------
 
 --- @type BenchmarkSpec
-local update = {
+local throughput = {
    fn = function(ctx, _p)
-      ctx.engine:update(1 / 60)
+      ctx.engine:update(DT)
    end,
-   before = create_system_engine,
+   before = function(_ctx, p)
+      local engine = lt_Engine()
+
+      for _ = 1, p.n_entities do
+         local e = lt_Entity()
+         e:initialize()
+         e:add(Position(0, 0))
+         e:add(Velocity(0, 0))
+         engine:addEntity(e)
+      end
+
+      local MovementSystem = lt_class("MovementSystem", lt_System)
+      function MovementSystem:requires()
+         return { "Position", "Velocity" }
+      end
+      function MovementSystem:update(dt)
+         for _, e in pairs(self.targets) do
+            local position = e:get("Position")
+            local velocity = e:get("Velocity")
+            position.x = position.x + velocity.x * dt
+            position.y = position.y + velocity.y * dt
+         end
+      end
+
+      engine:addSystem(MovementSystem())
+      engine:update(DT)
+      return { engine = engine }
+   end,
+   after = clear_engine,
+}
+
+--- @type BenchmarkSpec
+local overlap = {
+   fn = function(ctx, _p)
+      ctx.engine:update(DT)
+   end,
+   before = function(_ctx, p)
+      local engine = lt_Engine()
+
+      for i = 1, p.n_entities do
+         local archetype = i % 4
+         local e = lt_Entity()
+         e:initialize()
+         e:add(A(0))
+         e:add(B(0))
+         if archetype >= 1 then
+            e:add(C(0))
+         end
+         if archetype >= 2 then
+            e:add(D(0))
+         end
+         if archetype == 3 then
+            e:remove("D")
+            e:add(E(0))
+         end
+         engine:addEntity(e)
+      end
+
+      local SwapAB = lt_class("SwapAB", lt_System)
+      function SwapAB:requires()
+         return { "A", "B" }
+      end
+      function SwapAB:update(_dt)
+         for _, e in pairs(self.targets) do
+            local a_comp = e:get("A")
+            local b_comp = e:get("B")
+            a_comp.v, b_comp.v = b_comp.v, a_comp.v
+         end
+      end
+
+      local SwapCD = lt_class("SwapCD", lt_System)
+      function SwapCD:requires()
+         return { "C", "D" }
+      end
+      function SwapCD:update(_dt)
+         for _, e in pairs(self.targets) do
+            local c_comp = e:get("C")
+            local d_comp = e:get("D")
+            c_comp.v, d_comp.v = d_comp.v, c_comp.v
+         end
+      end
+
+      local SwapCE = lt_class("SwapCE", lt_System)
+      function SwapCE:requires()
+         return { "C", "E" }
+      end
+      function SwapCE:update(_dt)
+         for _, e in pairs(self.targets) do
+            local c_comp = e:get("C")
+            local e_comp = e:get("E")
+            c_comp.v, e_comp.v = e_comp.v, c_comp.v
+         end
+      end
+
+      engine:addSystem(SwapAB())
+      engine:addSystem(SwapCD())
+      engine:addSystem(SwapCE())
+      engine:update(DT)
+
+      return { engine = engine }
+   end,
+   after = clear_engine,
+}
+
+--- @type BenchmarkSpec
+local fragmented = {
+   fn = function(ctx, _p)
+      ctx.engine:update(DT)
+   end,
+   before = function(_ctx, p)
+      local engine = lt_Engine()
+
+      for i = 1, p.n_entities do
+         local buff_index = ((i - 1) % #BUFFS) + 1
+         local e = lt_Entity()
+         e:initialize()
+         e:add(Position(0, 0))
+         e:add(BUFFS[buff_index](buff_index))
+         engine:addEntity(e)
+      end
+
+      local sum = 0
+
+      local PositionSystem = lt_class("PositionSystem", lt_System)
+      function PositionSystem:requires()
+         return { "Position" }
+      end
+      function PositionSystem:update(_dt)
+         for _, e in pairs(self.targets) do
+            local pos = e:get("Position")
+            sum = sum + pos.x + pos.y
+         end
+      end
+
+      local Buff1System = lt_class("Buff1System", lt_System)
+      function Buff1System:requires()
+         return { "Buff1" }
+      end
+      function Buff1System:update(_dt)
+         for _, e in pairs(self.targets) do
+            sum = sum + e:get("Buff1").level
+         end
+      end
+
+      engine:addSystem(PositionSystem())
+      engine:addSystem(Buff1System())
+      engine:update(DT)
+      return { engine = engine }
+   end,
+   after = clear_engine,
+}
+
+--- @type BenchmarkSpec
+local chained = {
+   fn = function(ctx, _p)
+      ctx.engine:update(DT)
+   end,
+   before = function(_ctx, p)
+      local engine = lt_Engine()
+
+      for _ = 1, p.n_entities do
+         local e = lt_Entity()
+         e:initialize()
+         e:add(A(1))
+         e:add(B(0))
+         e:add(C(0))
+         e:add(D(0))
+         e:add(E(0))
+         engine:addEntity(e)
+      end
+
+      local SysAB = lt_class("SysAB", lt_System)
+      function SysAB:requires()
+         return { "A", "B" }
+      end
+      function SysAB:update(_dt)
+         for _, e in pairs(self.targets) do
+            e:get("B").v = e:get("A").v
+         end
+      end
+
+      local SysBC = lt_class("SysBC", lt_System)
+      function SysBC:requires()
+         return { "B", "C" }
+      end
+      function SysBC:update(_dt)
+         for _, e in pairs(self.targets) do
+            e:get("C").v = e:get("B").v
+         end
+      end
+
+      local SysCD = lt_class("SysCD", lt_System)
+      function SysCD:requires()
+         return { "C", "D" }
+      end
+      function SysCD:update(_dt)
+         for _, e in pairs(self.targets) do
+            e:get("D").v = e:get("C").v
+         end
+      end
+
+      local SysDE = lt_class("SysDE", lt_System)
+      function SysDE:requires()
+         return { "D", "E" }
+      end
+      function SysDE:update(_dt)
+         for _, e in pairs(self.targets) do
+            e:get("E").v = e:get("D").v
+         end
+      end
+
+      engine:addSystem(SysAB())
+      engine:addSystem(SysBC())
+      engine:addSystem(SysCD())
+      engine:addSystem(SysDE())
+      engine:update(DT)
+
+      return { engine = engine }
+   end,
+   after = clear_engine,
+}
+
+--- @type BenchmarkSpec
+local multi_20 = {
+   fn = function(ctx, _p)
+      ctx.engine:update(DT)
+   end,
+   before = function(_ctx, p)
+      local engine = lt_Engine()
+
+      for _ = 1, p.n_entities do
+         local e = lt_Entity()
+         e:initialize()
+         e:add(Comp1(0))
+         e:add(Comp2(0))
+         e:add(Comp3(0))
+         e:add(Comp4(0))
+         e:add(Comp5(0))
+         e:add(Comp6(0))
+         e:add(Comp7(0))
+         e:add(Comp8(0))
+         e:add(Comp9(0))
+         e:add(Comp10(0))
+         engine:addEntity(e)
+      end
+
+      local comp_names = {
+         "Comp1",
+         "Comp2",
+         "Comp3",
+         "Comp4",
+         "Comp5",
+         "Comp6",
+         "Comp7",
+         "Comp8",
+         "Comp9",
+         "Comp10",
+      }
+
+      local sum = 0
+
+      for i, comp_name in ipairs(comp_names) do
+         local Sys1 = lt_class("Sys" .. i .. "a", lt_System)
+         Sys1.comp_name = comp_name
+         function Sys1:requires()
+            return { self.class.comp_name }
+         end
+         function Sys1:update(_dt)
+            local cname = self.class.comp_name
+            for _, e in pairs(self.targets) do
+               sum = sum + e:get(cname).value
+            end
+         end
+         engine:addSystem(Sys1())
+
+         local Sys2 = lt_class("Sys" .. i .. "b", lt_System)
+         Sys2.comp_name = comp_name
+         function Sys2:requires()
+            return { self.class.comp_name }
+         end
+         function Sys2:update(_dt)
+            local cname = self.class.comp_name
+            for _, e in pairs(self.targets) do
+               sum = sum + e:get(cname).value
+            end
+         end
+         engine:addSystem(Sys2())
+      end
+
+      engine:update(DT)
+      return { engine = engine }
+   end,
+   after = clear_engine,
+}
+
+--- @type BenchmarkSpec
+local empty_systems = {
+   fn = function(ctx, _p)
+      ctx.engine:update(DT)
+   end,
+   before = function(_ctx, p)
+      local engine = lt_Engine()
+
+      for _ = 1, p.n_entities do
+         local e = lt_Entity()
+         e:initialize()
+         e:add(Position(0, 0))
+         engine:addEntity(e)
+      end
+
+      for i = 1, 20 do
+         local EmptySys = lt_class("EmptySys" .. i, lt_System)
+         function EmptySys:requires()
+            return { "NonExistent" }
+         end
+         function EmptySys:update(dt)
+            for _, e in pairs(self.targets) do
+               e:get("NonExistent").value = e:get("NonExistent").value + dt
+            end
+         end
+         engine:addSystem(EmptySys())
+      end
+
+      engine:update(DT)
+      return { engine = engine }
+   end,
    after = clear_engine,
 }
 
@@ -253,20 +617,36 @@ return {
          },
          component = {
             get = get,
+            set = set,
             remove = remove,
          },
+         tag = {
+            has = has,
+            remove = tag_remove,
+         },
          system = {
-            update = update,
+            throughput = throughput,
+            overlap = overlap,
+            fragmented = fragmented,
+            chained = chained,
+            multi_20 = multi_20,
+            empty_systems = empty_systems,
          },
       },
       ["lovetoys-nobatch"] = {
          component = {
             add = nobatch_add,
          },
+         tag = {
+            add = nobatch_tag_add,
+         },
       },
       ["lovetoys-batch"] = {
          component = {
             add = batch_add,
+         },
+         tag = {
+            add = batch_tag_add,
          },
       },
    },

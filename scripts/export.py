@@ -26,7 +26,7 @@ except ImportError:
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 README_PATH = REPO_ROOT / "README.md"
-PLOTS_PATH = REPO_ROOT / "results" / "plots.md"
+PLOTS_PATH = REPO_ROOT / "results" / "plots" / "plots.md"
 
 TIME = "s"
 MEMORY = "kb"
@@ -227,13 +227,28 @@ def get_specs() -> str:
 # =============================================================================
 
 
+def sort_results(df: pl.DataFrame) -> pl.DataFrame:
+    """Sort DataFrame by entities, group/test (TEST_ORDER), unit, framework."""
+    group_rank = {g: i for i, g in enumerate(TEST_ORDER)}
+    test_rank = {t: i for i, t in enumerate(t for tests in TEST_ORDER.values() for t in tests)}
+    return df.sort(
+        pl.col("entities"),
+        pl.col("group").replace_strict(group_rank, default=len(group_rank))
+        if "group" in df.columns
+        else pl.lit(0),
+        pl.col("test").replace_strict(test_rank, default=len(test_rank)),
+        pl.col("unit").replace_strict({TIME: 0, MEMORY: 1}),
+        "framework",
+    )
+
+
 def update_section(content: str, marker: str, new_content: str) -> str:
     """Replace content between AUTO-GENERATED-CONTENT markers."""
     pattern = (
         rf"(<!-- AUTO-GENERATED-CONTENT:START \({marker}\) -->\n)"
         rf".*?(<!-- AUTO-GENERATED-CONTENT:END -->)"
     )
-    replacement = rf"\g<1>{new_content}\n\g<2>"
+    replacement = rf"\g<1>\n{new_content}\n\n\g<2>"
     return re.sub(pattern, replacement, content, flags=re.DOTALL)
 
 
@@ -283,23 +298,14 @@ def pivot_with_best_framework(
     if has_groups:
         index_cols = ["group", *index_cols]
 
-    pivoted = df.pivot(on="framework", index=index_cols, values="median")
-    framework_cols = pivoted.select(pl.exclude(*index_cols)).columns
+    pivoted = df.pivot(on="framework", index=index_cols, values="median", maintain_order=True)
+    framework_cols = sorted(pivoted.select(pl.exclude(*index_cols)).columns)
 
-    sort_cols = ["entities", "_unit_order", "test"]
-    if has_groups:
-        sort_cols = ["group", *sort_cols]
-
-    pivoted = (
-        pivoted.with_columns(
-            pl.col("unit").replace_strict({TIME: 0, MEMORY: 1}).alias("_unit_order"),
-            pl.concat_list([pl.col(fw) for fw in framework_cols])
-            .list.arg_min()
-            .replace_strict(dict(enumerate(framework_cols)))
-            .alias("_best_framework"),
-        )
-        .sort(sort_cols)
-        .drop("_unit_order")
+    pivoted = pivoted.with_columns(
+        pl.concat_list([pl.col(fw) for fw in framework_cols])
+        .list.arg_min()
+        .replace_strict(dict(enumerate(framework_cols)))
+        .alias("_best_framework"),
     )
 
     return pivoted, framework_cols
@@ -314,16 +320,36 @@ def format_table_row(row: dict[str, Any], unit: str, framework_cols: list[str]) 
     return formatted
 
 
+def _build_toc(pivoted: pl.DataFrame) -> str:
+    """Build a table of contents from entity counts and groups."""
+    lines = []
+    for (entities,), entity_df in pivoted.group_by("entities", maintain_order=True):
+        slug = f"{entities}-entities"
+        lines.append(f"- **[{entities} entities](#{slug}):**")
+        if "group" in entity_df.columns:
+            groups = entity_df["group"].unique(maintain_order=True).to_list()
+            group_links = " · ".join(f"[{g.title()}](#{g.lower()})" for g in groups)
+            lines.append(f"  {group_links}")
+    return "\n".join(lines)
+
+
 def to_markdown_tables(df: pl.DataFrame) -> str:
-    """Convert benchmark results to markdown tables grouped by group, then entity count."""
+    """Convert benchmark results to markdown tables grouped by entity count, then group."""
     has_groups = "group" in df.columns
     pivoted, framework_cols = pivot_with_best_framework(df, has_groups)
-    sections = []
+    sections = [_build_toc(pivoted)]
 
     if has_groups:
-        for (group,), group_df in pivoted.group_by("group", maintain_order=True):
-            sections.append(f"## {group.title()}")
-            sections.append(_format_entity_tables(group_df, framework_cols))
+        for (entities,), entity_df in pivoted.group_by("entities", maintain_order=True):
+            sections.append(f"## {entities} entities")
+            for (group,), group_df in entity_df.group_by("group", maintain_order=True):
+                sections.append(f"### {group.title()}")
+                for (unit,), unit_group in group_df.group_by("unit", maintain_order=True):
+                    sections.append(f"#### {UNIT_DISPLAY_NAMES[unit]}")
+                    rows = [
+                        format_table_row(row, unit, framework_cols) for row in unit_group.to_dicts()
+                    ]
+                    sections.append(tabulate(rows, headers="keys", tablefmt="pipe"))
     else:
         sections.append(_format_entity_tables(pivoted, framework_cols))
 
@@ -572,13 +598,7 @@ def export_plots(
     has_groups = "group" in df.columns
     plot_paths: dict[str, list[Path]] = {}
 
-    flat_order = [t for tests in TEST_ORDER.values() for t in tests]
-    test_rank = {t: i for i, t in enumerate(flat_order)}
-    sorted_df = df.with_columns(
-        pl.col("test").replace_strict(test_rank, default=len(flat_order)).alias("_test_order"),
-    ).sort("_test_order")
-
-    for (test,), test_df in sorted_df.group_by("test", maintain_order=True):
+    for (test,), test_df in df.group_by("test", maintain_order=True):
         if has_groups:
             group = cast("str", test_df["group"].first())
             chart_title = f"{group}/{test}"
@@ -763,7 +783,7 @@ def create_summary_chart(
     for i, interp in enumerate(interpreter_order):
         display_name = INTERPRETER_DISPLAY_NAMES.get(interp, [interp])
         cols: list[alt.LayerChart] = []
-        for j, group in enumerate(list(TEST_ORDER)):
+        for j, group in enumerate(TEST_ORDER):
             group_max_points = cast("int", max_by_group[group])
             subset = df.filter(
                 pl.col("group") == group,
@@ -873,11 +893,14 @@ def plots_to_markdown(plot_paths: dict[str, list[Path]], *, relative_to: Path = 
     sections = []
 
     for group, paths in plot_paths.items():
-        heading = "####" if not group else "#####"
         if group:
             sections.append(f"#### {group.title()}")
+            test_heading = "#####"
+        else:
+            test_heading = "####"
         sections.extend(
-            f"{heading} {p.stem}\n![{p.stem} Plot]({p.relative_to(relative_to)})" for p in paths
+            f"{test_heading} {p.stem}\n![{p.stem} Plot]({p.relative_to(relative_to)})"
+            for p in paths
         )
 
     return "\n\n".join(sections)
@@ -901,18 +924,34 @@ def outputs_to_markdown(results_dir: Path, interpreters: list[str]) -> str:
 # =============================================================================
 
 
+def _update_markdown_file(path: Path, sections: list[tuple[str, str]]) -> None:
+    """Read a markdown file, update AUTO-GENERATED-CONTENT sections, and write it back."""
+    text = path.read_text()
+    for marker, content in sections:
+        text = update_section(text, marker, content)
+    path.write_text(text)
+    print(f"Updated {path.relative_to(Path.cwd())}")
+
+
+def export_csv(df: pl.DataFrame, results_dir: Path) -> None:
+    """Export sorted CSV per interpreter subdirectory."""
+    for (interpreter,), interpreter_df in df.group_by("interpreter", maintain_order=True):
+        out_dir = results_dir / interpreter
+        out_dir.mkdir(parents=True, exist_ok=True)
+        csv_path = out_dir / "results.csv"
+        interpreter_df.drop("interpreter").write_csv(csv_path)
+        print(f"Exported CSV to {csv_path.relative_to(Path.cwd())}")
+
+
 def export_markdown_tables(df: pl.DataFrame, results_dir: Path, specs: str) -> None:
     """Export markdown tables per interpreter subdirectory."""
-    for (interpreter,), interpreter_df in df.group_by(
-        "interpreter",
-        maintain_order=True,
-    ):
+    for (interpreter,), interpreter_df in df.group_by("interpreter", maintain_order=True):
         interpreter_df = interpreter_df.drop("interpreter")
         results_md_path = results_dir / interpreter / "results.md"
         results_md_path.parent.mkdir(parents=True, exist_ok=True)
         content = (
-            f"## Benchmark Environment\n\n```text\n{specs}\n```\n\n"
-            f"{to_markdown_tables(interpreter_df)}"
+            f"# Benchmark Environment\n\n```text\n{specs}\n```\n\n"
+            f"{to_markdown_tables(interpreter_df)}\n"
         )
         results_md_path.write_text(content)
         print(f"Exported markdown tables to {results_md_path.relative_to(Path.cwd())}")
@@ -920,7 +959,7 @@ def export_markdown_tables(df: pl.DataFrame, results_dir: Path, specs: str) -> N
 
 def main(results_dir: Path, skip_readme: bool) -> None:
     """Export benchmark results to plots, markdown tables, and README."""
-    df = load_results(results_dir)
+    df = sort_results(load_results(results_dir))
     if df.is_empty():
         print("No benchmark data available. Nothing to export.")
         return
@@ -938,30 +977,26 @@ def main(results_dir: Path, skip_readme: bool) -> None:
 
     plot_paths = export_plots(df, plot_dir, present_interpreters)
     print(f"Exported plots to {plot_dir.relative_to(Path.cwd())}")
+    export_csv(df, results_dir)
     export_markdown_tables(df, results_dir, specs)
 
     if not skip_readme:
-        readme = README_PATH.read_text()
-        readme_sections = [
-            ("BENCHMARK_ENVIRONMENT", f"```text\n{specs}\n```"),
-            ("SUMMARY", summary_chart_to_markdown(summary_path)),
-            ("OUTPUTS", outputs_to_markdown(results_dir, present_interpreters)),
-        ]
-        for marker, content in readme_sections:
-            readme = update_section(readme, marker, content)
-        README_PATH.write_text(readme)
-        print(f"Updated {README_PATH.relative_to(Path.cwd())}")
-
-        plots_md = PLOTS_PATH.read_text()
-        plots_sections = [
-            ("BENCHMARK_ENVIRONMENT", f"```text\n{specs}\n```"),
-            ("TOC", plots_toc_to_markdown(plot_paths)),
-            ("PLOTS", plots_to_markdown(plot_paths, relative_to=PLOTS_PATH.parent)),
-        ]
-        for marker, content in plots_sections:
-            plots_md = update_section(plots_md, marker, content)
-        PLOTS_PATH.write_text(plots_md)
-        print(f"Updated {PLOTS_PATH.relative_to(Path.cwd())}")
+        _update_markdown_file(
+            README_PATH,
+            [
+                ("BENCHMARK_ENVIRONMENT", f"```text\n{specs}\n```"),
+                ("SUMMARY", summary_chart_to_markdown(summary_path)),
+                ("OUTPUTS", outputs_to_markdown(results_dir, present_interpreters)),
+            ],
+        )
+        _update_markdown_file(
+            PLOTS_PATH,
+            [
+                ("BENCHMARK_ENVIRONMENT", f"```text\n{specs}\n```"),
+                ("TOC", plots_toc_to_markdown(plot_paths)),
+                ("PLOTS", plots_to_markdown(plot_paths, relative_to=PLOTS_PATH.parent)),
+            ],
+        )
 
 
 if __name__ == "__main__":

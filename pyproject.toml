@@ -6,8 +6,36 @@ dependencies = [
   "altair>=6.0.0",
   "distro>=1.9.0",
   "humanize>=4.15.0",
-  "polars>=1.37.1",
-  "psutil>=7.2.1",
+  "polars>=1.38.1",
+  "psutil>=7.2.2",
   "tabulate>=0.9.0",
   "vl-convert-python>=1.9.0.post1",
 ]
+
+[tool.pyright]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "standard"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "ANN401", # Dynamically typed expressions (typing.Any) are allowed
+  "FBT001", # Boolean positional arguments are fine for internal functions
+  "INP001", # scripts/ doesn't need __init__.py
+  "D100", # Module docstrings not required for scripts
+  "PLC0415", # Conditional imports inside functions are intentional
+  "PLR0913", # Too many function arguments (chart functions need many params)
+  "PLR2004", # Magic values are clear from context
+  "PLW2901", # Loop variable overwritten by assignment target
+  "RUF001", # Ambiguous unicode (× is intentional multiplication sign)
+  "S607", # Partial executable paths are fine for system tools
+  "T201", # print is appropriate for CLI scripts
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

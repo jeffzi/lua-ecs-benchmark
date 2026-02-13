@@ -1,5 +1,6 @@
 --- Minimal progress bar library (indicatif-inspired).
 --- Single-line progress bars with template-based formatting.
+--- ETA is computed via linear extrapolation (elapsed × remaining / completed).
 ---
 --- @example
 --- local Progress = require("src.lib.progress")
@@ -10,10 +11,12 @@
 --- end
 --- bar:stop("Done!")
 
+local chronos = require("chronos")
 local clear = require("terminal.clear")
 local cursor = require("terminal.cursor")
 local terminal = require("terminal")
 
+local chronos_nanotime = chronos.nanotime
 local math_floor = math.floor
 local string_format = string.format
 local string_rep = string.rep
@@ -50,7 +53,7 @@ end
 --- @field width number Bar width in characters.
 --- @field disable boolean Whether output is disabled.
 --- @field msg string|nil Custom message for {msg} placeholder.
---- @field start_time number|nil Start time (os.clock()).
+--- @field start_time number|nil Start time (chronos.nanotime()).
 --- @field private _len_width number Width for formatting position/total.
 local ProgressBar = {}
 ProgressBar.__index = ProgressBar
@@ -59,7 +62,7 @@ ProgressBar.__index = ProgressBar
 --- @param opts table Options: total (required), template, width, disable.
 --- @return ProgressBar
 local function new(opts)
-   assert(opts.total, "progress.new: 'total' is required")
+   assert(opts.total ~= nil, "progress.new: 'total' is required")
    local len_width = #tostring(opts.total)
    return setmetatable({
       total = opts.total,
@@ -71,27 +74,33 @@ local function new(opts)
    }, ProgressBar)
 end
 
---- Compute ETA string based on progress.
+--- Compute ETA string via linear extrapolation.
 --- @param elapsed number Elapsed time in seconds.
 --- @param pos number Current position.
---- @param total number Total items.
+--- @param total number Total steps.
 --- @return string ETA string.
 local function _compute_eta(elapsed, pos, total)
    if pos >= total then
       return "0s"
    end
-   if pos == 0 then
+   if pos <= 0 or elapsed <= 0 then
       return "?"
    end
-   return _format_duration((elapsed / pos) * (total - pos))
+   return _format_duration(elapsed * (total - pos) / pos)
 end
 
 --- Format the progress bar using the template.
 --- @param template? string Optional template override.
 --- @return string Formatted string.
 function ProgressBar:_format(template)
-   local elapsed = self.start_time and (os.clock() - self.start_time) or 0
-   local pct = self.total > 0 and (self.pos / self.total) or 0
+   local elapsed = 0
+   if self.start_time ~= nil then
+      elapsed = chronos_nanotime() - self.start_time
+   end
+   local pct = 0
+   if self.total > 0 then
+      pct = self.pos / self.total
+   end
 
    local w = self._len_width
    local vars = {
@@ -127,7 +136,7 @@ function ProgressBar:start()
    if self.disable then
       return
    end
-   self.start_time = os.clock()
+   self.start_time = chronos_nanotime()
    local ok = pcall(function()
       terminal.initialize()
       cursor.visible.set(false)
@@ -135,6 +144,7 @@ function ProgressBar:start()
    if not ok then
       self.disable = true
    end
+   self:_render()
 end
 
 --- Update the progress bar position.

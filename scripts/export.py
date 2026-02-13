@@ -52,7 +52,7 @@ TEST_ORDER: dict[str, list[str]] = {
     "system": ["throughput", "overlap", "fragmented", "chained", "multi_20", "empty_systems"],
 }
 
-MAX_RELATIVE_PERFORMANCE = 20.0
+MAX_RELATIVE_PERFORMANCE = 50.0
 
 # Chart styling constants
 FONT = "Inter, system-ui"
@@ -390,7 +390,7 @@ def create_unit_row(
     # drop ticks that would overlap at the chart's 150px height.
     max_raw = df["relative"].max()
     max_val = 1.0 if max_raw is None else cast("float", max_raw)
-    base_ticks = [1, 2, 5, 10, 15, 20]
+    base_ticks = [t for t in [1, 2, 5, 10, 15, 20, 25, 30, 40, 50] if t <= MAX_RELATIVE_PERFORMANCE]
     max_tick = next((t for t in base_ticks if t >= max_val), base_ticks[-1])
     y_ticks = [base_ticks[0]]
     min_gap = max_tick * 0.1
@@ -505,10 +505,6 @@ def create_relative_chart(
         .alias("relative"),
     )
 
-    # Identify and filter out outliers, keeping list of omitted frameworks
-    outlier_frameworks = (
-        df.filter(pl.col("relative") > MAX_RELATIVE_PERFORMANCE)["framework"].unique().sort()
-    ).to_list()
     df = df.filter(pl.col("relative") <= MAX_RELATIVE_PERFORMANCE)
 
     df = df.with_columns(
@@ -557,9 +553,15 @@ def create_relative_chart(
         )
         rows = alt.vconcat(time_row, memory_row)
 
-    if outlier_frameworks:
-        n = len(outlier_frameworks)
-        names = ", ".join(outlier_frameworks[:3])
+    visible_units = [TIME] if all_memory_zero else [TIME, MEMORY]
+    visible_frameworks = set(
+        df.filter(pl.col("unit").is_in(visible_units))["framework"].unique(),
+    )
+    absent_frameworks = sorted(present_frameworks - visible_frameworks)
+
+    if absent_frameworks:
+        n = len(absent_frameworks)
+        names = ", ".join(absent_frameworks[:3])
         suffix = f", \u2026 ({n} total)" if n > 3 else ""
         footnote = f"Omitted (>{MAX_RELATIVE_PERFORMANCE:.0f}\u00d7): {names}{suffix}"
         footnote_chart = (
@@ -598,14 +600,17 @@ def export_plots(
     has_groups = "group" in df.columns
     plot_paths: dict[str, list[Path]] = {}
 
-    for (test,), test_df in df.group_by("test", maintain_order=True):
+    group_cols = ["group", "test"] if has_groups else ["test"]
+
+    for keys, test_df in df.group_by(group_cols, maintain_order=True):
         if has_groups:
-            group = cast("str", test_df["group"].first())
+            group, test = keys
             chart_title = f"{group}/{test}"
             group_dir = out_dir / group
             group_dir.mkdir(exist_ok=True)
             plot_path = group_dir / f"{test}.svg"
         else:
+            (test,) = keys
             group = ""
             chart_title = cast("str", test)
             plot_path = out_dir / f"{test}.svg"
@@ -640,7 +645,14 @@ def collapse_to_best_variant(df: pl.DataFrame) -> pl.DataFrame:
                 pl.col("framework").replace_strict(base_map).alias("base_framework"),
             )
             .sort("median")
-            .group_by("interpreter", "entities", "test", "base_framework", maintain_order=True)
+            .group_by(
+                "interpreter",
+                "entities",
+                "group",
+                "test",
+                "base_framework",
+                maintain_order=True,
+            )
             .first()
         )
         .drop("framework")
@@ -651,8 +663,11 @@ def collapse_to_best_variant(df: pl.DataFrame) -> pl.DataFrame:
 def compute_borda_scores(df: pl.DataFrame) -> pl.DataFrame:
     """Compute Borda scores: score = K - rank, where K = number of frameworks per group."""
     ranked = df.with_columns(
-        pl.col("median").rank("min").over(["interpreter", "entities", "test"]).alias("rank"),
-        pl.col("framework").count().over(["interpreter", "entities", "test"]).alias("k"),
+        pl.col("median")
+        .rank("min")
+        .over(["interpreter", "entities", "group", "test"])
+        .alias("rank"),
+        pl.col("framework").count().over(["interpreter", "entities", "group", "test"]).alias("k"),
     )
 
     return (

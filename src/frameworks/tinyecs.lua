@@ -64,9 +64,11 @@ end
 local function clear_world(ctx)
    tiny_clearEntities(ctx.world)
    tiny_clearSystems(ctx.world)
+   ctx.world = nil
+   ctx.entities = nil
 end
 
-local TAG_NAMES = config.generate_tag_names(config.N_TAGS)
+local BUFF_NAMES = config.generate_buff_names(config.N_BUFFS)
 
 -- ----------------------------------------------------------------------------
 -- Entity Tests
@@ -124,9 +126,9 @@ local component = {
       fn = function(ctx)
          local entities = ctx.entities
          for i = 1, #entities do
-            local e = entities[i]
-            local _ = e.Position.x
-            _ = e.Alive
+            local pos = entities[i].Position
+            local _ = pos.x
+            local _ = pos.y
          end
       end,
       before = create_world(),
@@ -137,9 +139,9 @@ local component = {
       fn = function(ctx)
          local entities = ctx.entities
          for i = 1, #entities do
-            local e = entities[i]
-            e.Position.x = 1.0
-            e.Alive = false
+            local pos = entities[i].Position
+            pos.x = 1.0
+            pos.y = 1.0
          end
       end,
       before = create_world(),
@@ -152,7 +154,6 @@ local component = {
          for i = 1, #entities do
             local e = entities[i]
             e.Name = { value = "monster" }
-            e.Aggro = true
             tiny_addEntity(world, e)
          end
          tiny_refresh(world)
@@ -167,6 +168,51 @@ local component = {
          for i = 1, #entities do
             local e = entities[i]
             e.Velocity = nil
+            tiny_addEntity(world, e)
+         end
+         tiny_refresh(world)
+      end,
+      before = create_world(),
+      after = clear_world,
+   },
+}
+
+-- ----------------------------------------------------------------------------
+-- Tag Tests
+-- ----------------------------------------------------------------------------
+
+--- @type BenchmarkTests
+local tag = {
+   has = {
+      fn = function(ctx)
+         local entities = ctx.entities
+         for i = 1, #entities do
+            local _ = entities[i].Alive ~= nil
+         end
+      end,
+      before = create_world(),
+      after = clear_world,
+   },
+
+   add = {
+      fn = function(ctx)
+         local world, entities = ctx.world, ctx.entities
+         for i = 1, #entities do
+            local e = entities[i]
+            e.Aggro = true
+            tiny_addEntity(world, e)
+         end
+         tiny_refresh(world)
+      end,
+      before = create_world(),
+      after = clear_world,
+   },
+
+   remove = {
+      fn = function(ctx)
+         local world, entities = ctx.world, ctx.entities
+         for i = 1, #entities do
+            local e = entities[i]
             e.Alive = nil
             tiny_addEntity(world, e)
          end
@@ -274,11 +320,11 @@ local system = {
       before = function(_ctx, p)
          local world = tiny_world()
          for i = 1, p.n_entities do
-            local tag_index = ((i - 1) % #TAG_NAMES) + 1
+            local buff_index = ((i - 1) % #BUFF_NAMES) + 1
             local e = tiny_addEntity(world, {
                Position = { x = 0.0, y = 0.0 },
             })
-            e[TAG_NAMES[tag_index]] = { id = tag_index }
+            e[BUFF_NAMES[buff_index]] = { level = buff_index }
          end
 
          local sum = 0
@@ -291,16 +337,15 @@ local system = {
             sum = sum + pos.x + pos.y
          end
 
-         local Tag1System = tiny_processingSystem()
-         Tag1System.filter = tiny_requireAll("Tag1")
+         local Buff1System = tiny_processingSystem()
+         Buff1System.filter = tiny_requireAll("Buff1")
 
-         function Tag1System:process(e, _dt)
-            local pos = e.Position
-            sum = sum + pos.x + pos.y
+         function Buff1System:process(e, _dt)
+            sum = sum + e.Buff1.level
          end
 
          tiny_addSystem(world, PositionSystem)
-         tiny_addSystem(world, Tag1System)
+         tiny_addSystem(world, Buff1System)
          tiny_refresh(world)
          tiny_update(world, DT)
          return { world = world }
@@ -452,40 +497,6 @@ local system = {
 }
 
 -- ----------------------------------------------------------------------------
--- Stress Tests
--- ----------------------------------------------------------------------------
-
---- @type BenchmarkTests
-local stress = {
-   archetype_churn = {
-      fn = function(ctx, _p)
-         local world, entities = ctx.world, ctx.entities
-         for i = 1, #entities do
-            local e = entities[i]
-            for _ = 1, 100 do
-               e.B = { v = 0 }
-               tiny_addEntity(world, e)
-               tiny_refresh(world)
-               e.B = nil
-               tiny_addEntity(world, e)
-               tiny_refresh(world)
-            end
-         end
-      end,
-      before = function(_ctx, p)
-         local world = tiny_world()
-         local entities = {}
-         for i = 1, p.n_entities do
-            entities[i] = tiny_addEntity(world, { A = { v = 0 } })
-         end
-         shuffle(entities)
-         return { world = world, entities = entities }
-      end,
-      after = clear_world,
-   },
-}
-
--- ----------------------------------------------------------------------------
 -- Module Export
 -- ----------------------------------------------------------------------------
 
@@ -493,6 +504,6 @@ local stress = {
 return {
    entity = entity,
    component = component,
+   tag = tag,
    system = system,
-   stress = stress,
 }

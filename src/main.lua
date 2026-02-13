@@ -13,11 +13,11 @@ local ENTITY_COUNTS = config.ENTITY_COUNTS
 local GROUPS = {
    { name = "entity", tests = { "create_empty", "create_with_components", "destroy" } },
    { name = "component", tests = { "get", "set", "add", "remove" } },
+   { name = "tag", tests = { "has", "add", "remove" } },
    {
       name = "system",
       tests = { "throughput", "overlap", "fragmented", "chained", "multi_20", "empty_systems" },
    },
-   { name = "stress", tests = { "archetype_churn" } },
 }
 
 local HEADERS = {
@@ -74,20 +74,6 @@ local FRAMEWORK_NAMES = utils.keys(FRAMEWORKS)
 -- Helper Functions
 -- ----------------------------------------------------------------------------
 
---- Return entity counts at or below max_allowed.
---- @param counts number[] Entity counts.
---- @param max_allowed number Maximum allowed count.
---- @return number[]
-local function filter_counts(counts, max_allowed)
-   local filtered = {}
-   for _, n in ipairs(counts) do
-      if n <= max_allowed then
-         filtered[#filtered + 1] = n
-      end
-   end
-   return filtered
-end
-
 --- Return total test count after applying filters.
 --- @param groups_to_run BenchmarkGroup[] Groups to run.
 --- @param test_filter? table<string, boolean> Test name filter set.
@@ -104,48 +90,63 @@ local function count_tests(groups_to_run, test_filter)
    return count
 end
 
---- Group frameworks by their max_entities limit for a given test.
+--- Collect benchmark specs for a given test across frameworks.
 --- @param framework_names string[] Framework names to check.
 --- @param group_name string Test group name.
 --- @param test_name string Test name.
---- @param max_count number Maximum entity count being benchmarked.
---- @return table<number|"unlimited", table<string, BenchmarkSpec>>
-local function group_by_entity_limit(framework_names, group_name, test_name, max_count)
-   local groups = {}
+--- @return table<string, BenchmarkSpec>
+local function collect_specs(framework_names, group_name, test_name)
+   local specs = {}
    for _, name in ipairs(framework_names) do
       local grouped_tests = FRAMEWORKS[name]
       local group_tests = grouped_tests and grouped_tests[group_name]
       local spec = group_tests and group_tests[test_name]
       if spec then
-         local limit = spec.max_entities
-         if limit and limit < max_count then
-            groups[limit] = groups[limit] or {}
-            groups[limit][name] = spec
-         else
-            groups.unlimited = groups.unlimited or {}
-            groups.unlimited[name] = spec
+         specs[name] = spec
+      end
+   end
+   return specs
+end
+
+--- Compute entity-count-weighted total for progress bar.
+--- Each result row contributes its entity count to the total,
+--- so higher entity counts (which take longer) get proportionally more weight.
+--- @param groups_to_run BenchmarkGroup[] Groups to run.
+--- @param test_filter? table<string, boolean> Test name filter set.
+--- @param framework_names string[] Framework names to check.
+--- @param entity_counts number[] Entity counts to benchmark.
+--- @return number
+local function compute_total_weight(groups_to_run, test_filter, framework_names, entity_counts)
+   local entity_sum = 0
+   for i = 1, #entity_counts do
+      entity_sum = entity_sum + entity_counts[i]
+   end
+
+   local total = 0
+   for _, group in ipairs(groups_to_run) do
+      for _, test_name in ipairs(group.tests) do
+         if not test_filter or test_filter[test_name] then
+            local specs = collect_specs(framework_names, group.name, test_name)
+            local n_frameworks = 0
+            for _ in pairs(specs) do
+               n_frameworks = n_frameworks + 1
+            end
+            -- 2 benchmark types (time, memory) × frameworks × entity count sum
+            total = total + 2 * n_frameworks * entity_sum
          end
       end
    end
-   return groups
+   return total
 end
 
 --- Log benchmark info to stdout when progress bar is disabled.
 --- @param specs table<string, table> Framework specs.
 --- @param test_name string Test name (e.g., "entity/create_empty").
---- @param max_entities? number Max entities limit for display.
-local function log_benchmark_info(specs, test_name, max_entities)
+local function log_benchmark_info(specs, test_name)
    local names = utils.keys(specs)
    table.sort(names)
 
-   local limit_info = max_entities and string.format(" (max_entities=%d)", max_entities) or ""
-   utils.printf(
-      "[%s] Running %d frameworks%s: %s",
-      test_name,
-      #names,
-      limit_info,
-      table.concat(names, ", ")
-   )
+   utils.printf("[%s] Running %d frameworks: %s", test_name, #names, table.concat(names, ", "))
 end
 
 -- ----------------------------------------------------------------------------
@@ -158,22 +159,12 @@ end
 --- @param group_name string Test group name.
 --- @param test_name string Test name within group.
 --- @param all_stats table[] Accumulator for CSV rows.
---- @param max_entities? number Max entities limit for logging.
 --- @param show_log boolean Show log output.
---- @param on_benchmark? fun(label: string) Callback after each benchmark type.
-local function run_benchmarks(
-   specs,
-   counts,
-   group_name,
-   test_name,
-   all_stats,
-   max_entities,
-   show_log,
-   on_benchmark
-)
+--- @param on_result? fun(n_entities: number, label: string) Per-result callback.
+local function run_benchmarks(specs, counts, group_name, test_name, all_stats, show_log, on_result)
    local full_name = group_name .. "/" .. test_name
    if show_log then
-      log_benchmark_info(specs, full_name, max_entities)
+      log_benchmark_info(specs, full_name)
    end
 
    local params = { params = { n_entities = counts } }
@@ -193,9 +184,9 @@ local function run_benchmarks(
             r.ci_upper,
             r.rounds,
          }
-      end
-      if on_benchmark then
-         on_benchmark(bench.label)
+         if on_result then
+            on_result(r.params.n_entities, bench.label)
+         end
       end
    end
 end
@@ -214,68 +205,40 @@ local function main(output, framework_names, group_filter, test_filter, entity_c
    entity_counts = entity_counts or ENTITY_COUNTS
 
    local all_stats = {}
-   local max_count = entity_counts[#entity_counts]
    local total_tests = count_tests(group_filter, test_filter)
+   local total_weight =
+      compute_total_weight(group_filter, test_filter, framework_names, entity_counts)
    local bar = Progress({
-      total = total_tests * 2,
+      total = total_weight,
       template = "{bar} {pct} | {msg} | {elapsed} < {eta}",
       disable = opts.no_progress,
    })
    bar:start()
 
    local show_log = bar.disable
-   local progress_count = 0
+   local progress_weight = 0
 
    for _, group in ipairs(group_filter) do
       local group_name = group.name
 
       for _, test_name in ipairs(group.tests) do
          if not test_filter or test_filter[test_name] then
-            local entity_limit_groups =
-               group_by_entity_limit(framework_names, group_name, test_name, max_count)
-
+            local specs = collect_specs(framework_names, group_name, test_name)
             local full_name = group_name .. "/" .. test_name
-            local reported = {}
-            local function on_benchmark(label)
-               if not reported[label] then
-                  reported[label] = true
-                  progress_count = progress_count + 1
-                  bar:update(progress_count, string.format("%s (%s)", full_name, label))
-               end
-            end
 
-            -- Run unlimited frameworks first (all entity counts)
-            if entity_limit_groups.unlimited then
+            if next(specs) then
                run_benchmarks(
-                  entity_limit_groups.unlimited,
+                  specs,
                   entity_counts,
                   group_name,
                   test_name,
                   all_stats,
-                  nil,
                   show_log,
-                  on_benchmark
-               )
-               entity_limit_groups.unlimited = nil
-            end
-
-            -- Run limited frameworks with filtered entity counts
-            for limit, specs in pairs(entity_limit_groups) do
-               if type(limit) == "number" then
-                  local counts = filter_counts(entity_counts, limit)
-                  if #counts > 0 then
-                     run_benchmarks(
-                        specs,
-                        counts,
-                        group_name,
-                        test_name,
-                        all_stats,
-                        limit,
-                        show_log,
-                        on_benchmark
-                     )
+                  function(n_entities, label)
+                     progress_weight = progress_weight + n_entities
+                     bar:update(progress_weight, string.format("%s (%s)", full_name, label))
                   end
-               end
+               )
             end
          end
       end

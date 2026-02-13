@@ -8,12 +8,6 @@ vars:
 
 tasks:
   default:
-    internal: true
-    cmds:
-      - task: all
-
-  all:
-    desc: Benchmark and export the plots. Use JIT=off to disable JIT (e.g., task all JIT=off).
     cmds:
       - task: benchmark
       - task: export
@@ -24,7 +18,7 @@ tasks:
     cmds:
       - git submodule update --init
 
-  install-deps:
+  install-lua-deps:
     internal: true
     desc: Install Lua dependencies.
     status:
@@ -47,11 +41,34 @@ tasks:
       - sh: luarocks --version
         msg: luarocks not found in PATH.
 
+  install-prek:
+    internal: true
+    desc: Install prek and pre-commit hooks.
+    status:
+      - prek --version
+    cmds:
+      - uv tool install prek
+      - prek install
+    preconditions:
+      - sh: uv --version
+        msg: "uv not found in PATH. See https://docs.astral.sh/uv/getting-started/installation/"
+
+  install-py-deps:
+    internal: true
+    desc: Install Python dependencies.
+    deps:
+      - install-prek
+    cmds:
+      - uv sync --quiet
+    preconditions:
+      - sh: uv --version
+        msg: "uv not found in PATH. See https://docs.astral.sh/uv/getting-started/installation/"
+
   benchmark:
     desc: Benchmark with the current Lua interpreter. Use JIT=off to disable JIT (e.g., task benchmark JIT=off).
     deps:
       - init-submodules
-      - install-deps
+      - install-lua-deps
     vars:
       LUA_INTERPRETER:
         sh: lua -e "if jit then print('luajit-{{.JIT}}') else print('lua'.._VERSION:match('%d+%.%d+')) end"
@@ -59,15 +76,6 @@ tasks:
         sh: lua -e "if jit and '{{.JIT}}'=='off' then print('-joff') end"
     cmds:
       - lua {{.JIT_FLAG}} src/main.lua -o "{{.OUT_DIR}}/{{.LUA_INTERPRETER}}/results.csv" {{.CLI_ARGS}}
-
-  install-py-deps:
-    internal: true
-    desc: Install Python dependencies.
-    cmds:
-      - uv sync --quiet
-    preconditions:
-      - sh: uv --version
-        msg: "uv not found in PATH. See https://docs.astral.sh/uv/getting-started/installation/"
 
   export:
     desc: Export plots and markdown.

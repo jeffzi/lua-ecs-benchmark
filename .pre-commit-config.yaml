@@ -43,7 +43,7 @@ repos:
 
   # Python linting & formatting
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.0
+    rev: v0.15.1
     hooks:
       - id: ruff-check
         args: [--fix]
@@ -51,7 +51,7 @@ repos:
 
   # Python type checking
   - repo: https://github.com/DetachHead/basedpyright-prek-mirror
-    rev: 1.37.4
+    rev: 1.38.0
     hooks:
       - id: basedpyright
 

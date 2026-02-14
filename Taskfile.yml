@@ -84,6 +84,20 @@ tasks:
     cmds:
       - uv run scripts/export.py {{.OUT_DIR}}
 
+  spot-check:
+    desc: Spot-check benchmark results for anomalies.
+    deps:
+      - install-py-deps
+    cmds:
+      - uv run scripts/spot-check.py
+
+  clean:
+    desc: Remove generated exports (plots, markdown) but keep raw CSVs.
+    prompt: This will delete all generated files in {{.OUT_DIR}}/. Continue?
+    cmds:
+      - rm -rf {{.OUT_DIR}}/plots
+      - find {{.OUT_DIR}} -name "results.md" -delete
+
   update-submodules:
     desc: Update submodules to latest commits. Use -- -t to force show README table.
     cmds:

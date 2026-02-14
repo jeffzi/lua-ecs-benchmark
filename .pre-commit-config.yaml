@@ -69,7 +69,7 @@ repos:
     rev: v0.20.0
     hooks:
       - id: markdownlint-cli2
-        exclude: ^results/plots/plots\.md$
+        exclude: ^results/plots/README\.md$
 
   # GitHub Actions linter
   - repo: https://github.com/rhysd/actionlint

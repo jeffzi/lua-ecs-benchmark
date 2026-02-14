@@ -12,7 +12,7 @@ config.DT = 1 / 60
 config.N_BUFFS = 20
 
 --- Default entity counts for benchmarks.
-config.ENTITY_COUNTS = { 100, 1000, 10000, 50000 }
+config.ENTITY_COUNTS = { 100, 1000, 10000 }
 
 --- Generate array of buff names {"Buff1", "Buff2", ..., "BuffN"}.
 --- @param n number Number of buffs to generate.

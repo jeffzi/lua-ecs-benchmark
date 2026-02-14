@@ -26,7 +26,7 @@ except ImportError:
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 README_PATH = REPO_ROOT / "README.md"
-PLOTS_PATH = REPO_ROOT / "results" / "plots" / "plots.md"
+PLOTS_PATH = REPO_ROOT / "results" / "plots" / "README.md"
 
 TIME = "s"
 MEMORY = "kb"
@@ -912,7 +912,7 @@ def generate_plots_markdown(
     *,
     relative_to: Path,
 ) -> str:
-    """Generate the full plots.md content programmatically."""
+    """Generate the full plots README content programmatically."""
     sections = [
         "# Benchmark Plots",
         f"```text\n{specs}\n```",

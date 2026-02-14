@@ -6,4 +6,4 @@
 	url = https://github.com/Keyslam-Group/Concord
 [submodule "lib/nata"]
 	path = lib/nata
-	url = git@github.com:tesselode/nata.git
+	url = https://github.com/tesselode/nata.git

@@ -883,7 +883,7 @@ def plots_toc_to_markdown(plot_paths: dict[str, list[Path]]) -> str:
     """
     lines = []
     for group, paths in plot_paths.items():
-        test_links = " · ".join(f"[{p.stem}](#{p.stem})" for p in paths)
+        test_links = " · ".join(f"[{p.stem}](#{group}-{p.stem})" for p in paths)
         lines.append(f"- **[{group.title()}](#{group.lower()}):** {test_links}")
     return "\n".join(lines)
 
@@ -898,7 +898,9 @@ def plots_to_markdown(plot_paths: dict[str, list[Path]], *, relative_to: Path = 
     for group, paths in plot_paths.items():
         sections.append(f"#### {group.title()}")
         sections.extend(
-            f"##### {p.stem}\n![{p.stem} Plot]({p.relative_to(relative_to)})" for p in paths
+            f'<a id="{group}-{p.stem}"></a>\n\n##### {p.stem}\n\n'
+            f"![{p.stem} Plot]({p.relative_to(relative_to)})"
+            for p in paths
         )
 
     return "\n\n".join(sections)

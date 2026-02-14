@@ -49,7 +49,7 @@ TEST_ORDER: dict[str, list[str]] = {
     "system": ["throughput", "overlap", "fragmented", "chained", "multi_20", "empty_systems"],
 }
 
-MAX_RELATIVE_PERFORMANCE = 50.0
+MAX_RELATIVE_PERFORMANCE = 20.0
 
 # Chart styling constants
 FONT = "Inter, system-ui"
@@ -398,7 +398,7 @@ def create_unit_row(
 
     return (
         (bars + labels)
-        .properties(width=300, height=150)
+        .properties(width=220, height=150)
         .facet(
             column=alt.Column(
                 "display_interpreter:N",
@@ -424,6 +424,50 @@ def create_unit_row(
     )
 
 
+def create_omission_footnote(
+    all_combos: pl.DataFrame,
+    visible_combos: pl.DataFrame,
+    interpreters: list[str],
+) -> alt.Chart | None:
+    """Create a footnote chart listing frameworks omitted by the relative threshold."""
+    omitted = (
+        all_combos.join(
+            visible_combos,
+            on=["interpreter", "entities", "framework"],
+            how="anti",
+        )
+        .select("interpreter", "framework")
+        .unique()
+    )
+
+    if omitted.is_empty():
+        return None
+
+    active = {
+        interp: fws
+        for interp in interpreters
+        if (fws := omitted.filter(pl.col("interpreter") == interp)["framework"].sort().to_list())
+    }
+
+    header = f"Omitted (>{MAX_RELATIVE_PERFORMANCE:.0f}\u00d7):"
+    all_same = len(active) == len(interpreters) and len({tuple(v) for v in active.values()}) == 1
+    if all_same:
+        lines = [f"{header} {', '.join(next(iter(active.values())))}"]
+    else:
+        lines = [header]
+        for interp, fws in active.items():
+            label = " ".join(INTERPRETERS.get(interp, [interp]))
+            lines.append(f"  \u2022 {label}: {', '.join(fws)}")
+
+    footnote_df = pl.DataFrame({"text": lines, "order": list(range(len(lines)))})
+    return (
+        alt.Chart(footnote_df)
+        .mark_text(align="left", baseline="top", fontSize=8, fontStyle="italic", color="#666")
+        .encode(x=alt.value(0), y=alt.Y("order:O", axis=None), text="text:N")
+        .properties(width=220, height=14 * len(lines))
+    )
+
+
 def create_relative_chart(
     df: pl.DataFrame,
     test_name: str,
@@ -434,13 +478,6 @@ def create_relative_chart(
 ) -> alt.VConcatChart:
     """Create a relative performance chart with vconcat for units, facet for interpreters."""
     display_map = {k: "\n".join(v) for k, v in INTERPRETERS.items()}
-
-    # Filter color scale to only frameworks present in this chart
-    present_frameworks = set(df["framework"].unique())
-    chart_domain = [d for d in color_domain if d in present_frameworks]
-    chart_range = [
-        r for d, r in zip(color_domain, color_range, strict=True) if d in present_frameworks
-    ]
 
     df = df.with_columns(
         pl.col("interpreter")
@@ -456,7 +493,15 @@ def create_relative_chart(
         .alias("relative"),
     )
 
+    all_combos = df.select("interpreter", "entities", "framework").unique()
+
     df = df.filter(pl.col("relative") <= MAX_RELATIVE_PERFORMANCE)
+
+    visible_frameworks = set(df["framework"].unique())
+    chart_domain = [d for d in color_domain if d in visible_frameworks]
+    chart_range = [
+        r for d, r in zip(color_domain, color_range, strict=True) if d in visible_frameworks
+    ]
 
     df = df.with_columns(
         pl.col("relative").rank("min").over(["interpreter", "entities", "unit"]).alias("rank"),
@@ -478,8 +523,8 @@ def create_relative_chart(
     time_row = create_unit_row(
         df.filter(pl.col("unit") == TIME),
         framework_order,
-        color_domain,
-        color_range,
+        chart_domain,
+        chart_range,
         display_interpreters,
         show_legend=True,
         show_header=True,
@@ -505,23 +550,14 @@ def create_relative_chart(
         rows = alt.vconcat(time_row, memory_row)
 
     visible_units = [TIME] if all_memory_zero else [TIME, MEMORY]
-    visible_frameworks = set(
-        df.filter(pl.col("unit").is_in(visible_units))["framework"].unique(),
+    visible_combos = (
+        df.filter(pl.col("unit").is_in(visible_units))
+        .select("interpreter", "entities", "framework")
+        .unique()
     )
-    absent_frameworks = sorted(present_frameworks - visible_frameworks)
-
-    if absent_frameworks:
-        n = len(absent_frameworks)
-        names = ", ".join(absent_frameworks[:3])
-        suffix = f", \u2026 ({n} total)" if n > 3 else ""
-        footnote = f"Omitted (>{MAX_RELATIVE_PERFORMANCE:.0f}\u00d7): {names}{suffix}"
-        footnote_chart = (
-            alt.Chart(pl.DataFrame({"text": [footnote]}))
-            .mark_text(align="left", fontSize=8, fontStyle="italic", color="#666")
-            .encode(x=alt.value(0), text="text:N")
-            .properties(width=300, height=14)
-        )
-        rows = alt.vconcat(rows, footnote_chart)
+    footnote = create_omission_footnote(all_combos, visible_combos, present_interpreters)
+    if footnote is not None:
+        rows = alt.vconcat(rows, footnote)
 
     return (
         rows.properties(

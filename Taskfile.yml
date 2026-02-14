@@ -41,23 +41,9 @@ tasks:
       - sh: luarocks --version
         msg: luarocks not found in PATH.
 
-  install-prek:
-    internal: true
-    desc: Install prek and pre-commit hooks.
-    status:
-      - prek --version
-    cmds:
-      - uv tool install prek
-      - prek install
-    preconditions:
-      - sh: uv --version
-        msg: "uv not found in PATH. See https://docs.astral.sh/uv/getting-started/installation/"
-
   install-py-deps:
     internal: true
     desc: Install Python dependencies.
-    deps:
-      - install-prek
     cmds:
       - uv sync --quiet
     preconditions:

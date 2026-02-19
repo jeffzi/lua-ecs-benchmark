@@ -60,6 +60,7 @@ local BENCHMARK_TYPES = {
 local MODULES = {
    ["ecs-lua"] = require("src.frameworks.ecs-lua"),
    concord = require("src.frameworks.concord"),
+   evolved = require("src.frameworks.evolved"),
    lovetoys = require("src.frameworks.lovetoys"),
    nata = require("src.frameworks.nata"),
    tinyecs = require("src.frameworks.tinyecs"),

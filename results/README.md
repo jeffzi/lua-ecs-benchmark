@@ -25,6 +25,18 @@ outweighs any batching benefit for single-component additions.
 Batch mode targets bulk operations where multiple components are added
 at once; the overhead is expected when adding one at a time.
 
+## evolved.lua: Extreme LuaJIT Interpreter Speedup
+
+evolved.lua shows **20–35× faster** under LuaJIT's interpreter
+(luajit-off) compared to Lua 5.1 on simple operations like
+`component/get`, `component/set`, and `system/throughput`. Its
+lightweight table-based design maps directly to operations LuaJIT's
+interpreter handles natively, producing much larger speedup ratios
+than other frameworks.
+
+This is the inverse of Concord's JIT pessimization — evolved's
+simplicity is ideal for LuaJIT, while Concord's complexity defeats it.
+
 ## ecs-lua: Read-Only Operations Allocate Memory
 
 `component/get` and `tag/has` on ecs-lua allocate memory proportional

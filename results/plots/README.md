@@ -1,7 +1,7 @@
 # Benchmark Plots
 
 ```text
-OS: macOS 26.2
+OS: macOS 26.3
 CPU: Apple M2 Max
 Cores: 12 cores (12 threads)
 Max Frequency: 3.50 GHz

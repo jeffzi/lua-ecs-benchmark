@@ -32,12 +32,12 @@ to entity count (~7.8 KB per 100 entities on Lua 5.1). The framework
 creates intermediate tables in its getter path — a design choice, not
 a benchmark error.
 
-## Concord: Non-Deterministic Memory at Small Scale
+## tinyecs / nata: Read Slower Than Write at High Entity Counts
 
-A few Concord operations (`entity/destroy`, `component/remove`) show
-wide memory confidence intervals at 100 entities under LuaJIT. At
-this scale, Lua's garbage collector introduces enough variability to
-spread the intervals. They collapse at higher entity counts.
+Under LuaJIT at 10K entities, `component/get` is ~1.6× slower than
+`component/set` for tinyecs and nata. Both frameworks use simple
+table lookups, but the get path creates slightly more pressure on
+LuaJIT's trace compiler at scale.
 
 ## Measurement Noise
 

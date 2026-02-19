@@ -103,7 +103,7 @@ end
 -- Entity Tests
 -- ----------------------------------------------------------------------------
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local create_empty = {
    fn = function(ctx, p)
       local world = ctx.world
@@ -118,7 +118,7 @@ local create_empty = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local destroy = {
    fn = function(ctx, _p)
       local world, entities = ctx.world, ctx.entities
@@ -133,7 +133,7 @@ local destroy = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local nobatch_create_with_components = {
    fn = function(ctx, p)
       local world = ctx.world
@@ -150,7 +150,7 @@ local nobatch_create_with_components = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local batch_create_with_components = {
    fn = function(ctx, p)
       local world = ctx.world
@@ -169,7 +169,7 @@ local batch_create_with_components = {
 -- Component Tests
 -- ----------------------------------------------------------------------------
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local get = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -183,7 +183,7 @@ local get = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local set = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -197,7 +197,7 @@ local set = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local remove = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -209,7 +209,7 @@ local remove = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local nobatch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -221,7 +221,7 @@ local nobatch_add = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local batch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -237,7 +237,7 @@ local batch_add = {
 -- Tag Tests
 -- ----------------------------------------------------------------------------
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local has = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -249,7 +249,7 @@ local has = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local tag_remove = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -261,7 +261,7 @@ local tag_remove = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local nobatch_tag_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -273,7 +273,7 @@ local nobatch_tag_add = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local batch_tag_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -289,7 +289,7 @@ local batch_tag_add = {
 -- System Tests
 -- ----------------------------------------------------------------------------
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local throughput = {
    fn = function(ctx, _p)
       local timestep = ctx.timestep + 1
@@ -325,7 +325,7 @@ local throughput = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local overlap = {
    fn = function(ctx, _p)
       local timestep = ctx.timestep + 1
@@ -378,7 +378,7 @@ local overlap = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local fragmented = {
    fn = function(ctx, _p)
       local timestep = ctx.timestep + 1
@@ -417,7 +417,7 @@ local fragmented = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local chained = {
    fn = function(ctx, _p)
       local timestep = ctx.timestep + 1
@@ -466,7 +466,7 @@ local chained = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local multi_20 = {
    fn = function(ctx, _p)
       local timestep = ctx.timestep + 1
@@ -523,7 +523,7 @@ local multi_20 = {
    after = destroy_world,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local empty_systems = {
    fn = function(ctx, _p)
       local timestep = ctx.timestep + 1

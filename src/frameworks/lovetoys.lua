@@ -100,7 +100,7 @@ end
 -- Entity Tests
 -- ----------------------------------------------------------------------------
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local create_empty = {
    fn = function(ctx, p)
       local engine = ctx.engine
@@ -114,7 +114,7 @@ local create_empty = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local create_with_components = {
    fn = function(ctx, p)
       local engine = ctx.engine
@@ -130,7 +130,7 @@ local create_with_components = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local destroy = {
    fn = function(ctx, _p)
       local engine, entities = ctx.engine, ctx.entities
@@ -146,7 +146,7 @@ local destroy = {
 -- Component Tests
 -- ----------------------------------------------------------------------------
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local get = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -160,7 +160,7 @@ local get = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local set = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -174,7 +174,7 @@ local set = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local remove = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -186,7 +186,7 @@ local remove = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local nobatch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -200,7 +200,7 @@ local nobatch_add = {
 
 -- NOTE: addMultiple internally loops individual add() calls, firing a
 -- ComponentAdded event per component. No true batching benefit.
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local batch_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -216,7 +216,7 @@ local batch_add = {
 -- Tag Tests
 -- ----------------------------------------------------------------------------
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local has = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -228,7 +228,7 @@ local has = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local nobatch_tag_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -240,7 +240,7 @@ local nobatch_tag_add = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local batch_tag_add = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -252,7 +252,7 @@ local batch_tag_add = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local tag_remove = {
    fn = function(ctx, _p)
       local entities = ctx.entities
@@ -268,7 +268,7 @@ local tag_remove = {
 -- System Tests
 -- ----------------------------------------------------------------------------
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local throughput = {
    fn = function(ctx, _p)
       ctx.engine:update(DT)
@@ -304,7 +304,7 @@ local throughput = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local overlap = {
    fn = function(ctx, _p)
       ctx.engine:update(DT)
@@ -377,7 +377,7 @@ local overlap = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local fragmented = {
    fn = function(ctx, _p)
       ctx.engine:update(DT)
@@ -425,7 +425,7 @@ local fragmented = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local chained = {
    fn = function(ctx, _p)
       ctx.engine:update(DT)
@@ -495,7 +495,7 @@ local chained = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local multi_20 = {
    fn = function(ctx, _p)
       ctx.engine:update(DT)
@@ -568,7 +568,7 @@ local multi_20 = {
    after = clear_engine,
 }
 
---- @type BenchmarkSpec
+--- @type luamark.Spec
 local empty_systems = {
    fn = function(ctx, _p)
       ctx.engine:update(DT)

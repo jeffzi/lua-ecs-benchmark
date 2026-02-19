@@ -567,8 +567,8 @@ local system = {
 -- ----------------------------------------------------------------------------
 
 --- Wrap a test spec to disable SERIALIZE_BY_DEFAULT during setup/teardown.
---- @param spec BenchmarkSpec
---- @return BenchmarkSpec
+--- @param spec luamark.Spec
+--- @return luamark.Spec
 local function wrap_no_serialize(spec)
    return {
       fn = spec.fn,
@@ -576,8 +576,8 @@ local function wrap_no_serialize(spec)
          concord_entity.SERIALIZE_BY_DEFAULT = false
          return spec.before(ctx, p)
       end,
-      after = spec.after and function(ctx)
-         spec.after(ctx)
+      after = spec.after and function(ctx, p)
+         spec.after(ctx, p)
          concord_entity.SERIALIZE_BY_DEFAULT = ORIGINAL_SERIALIZE
       end,
    }

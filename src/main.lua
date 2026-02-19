@@ -33,9 +33,24 @@ local HEADERS = {
    "rounds",
 }
 
+local jit_off = jit and jit.off
+local jit_on = jit and jit.on
+
 local BENCHMARK_TYPES = {
    { fn = luamark.compare_time, label = "time" },
-   { fn = luamark.compare_memory, label = "memory" },
+   {
+      fn = function(funcs, opts)
+         if jit_off then
+            jit_off()
+         end
+         local results = luamark.compare_memory(funcs, opts)
+         if jit_on then
+            jit_on()
+         end
+         return results
+      end,
+      label = "memory",
+   },
 }
 
 -- ----------------------------------------------------------------------------
@@ -94,7 +109,7 @@ end
 --- @param framework_names string[] Framework names to check.
 --- @param group_name string Test group name.
 --- @param test_name string Test name.
---- @return table<string, BenchmarkSpec>
+--- @return table<string, luamark.Spec>
 local function collect_specs(framework_names, group_name, test_name)
    local specs = {}
    for _, name in ipairs(framework_names) do
@@ -154,7 +169,7 @@ end
 -- ----------------------------------------------------------------------------
 
 --- Execute time and memory benchmarks, appending results to all_stats.
---- @param specs table<string, table> Framework specs to benchmark.
+--- @param specs table<string, luamark.Spec> Framework specs to benchmark.
 --- @param counts number[] Entity counts to benchmark.
 --- @param group_name string Test group name.
 --- @param test_name string Test name within group.
@@ -256,7 +271,7 @@ end
 -- CLI
 -- ----------------------------------------------------------------------------
 
-local CLI_FRAMEWORK_CHOICES = utils.concat(FRAMEWORK_NAMES, utils.keys(FRAMEWORK_ALIASES))
+local MODULE_NAMES = utils.keys(MODULES)
 
 local GROUP_NAMES = {}
 local ALL_TESTS = {}
@@ -274,8 +289,8 @@ local function cli()
    parser:option("-o --output", "CSV file where the results will be saved."):convert(utils.mkdir)
    parser
       :option("--framework", "ECS frameworks to benchmark")
-      :choices(CLI_FRAMEWORK_CHOICES)
-      :default(CLI_FRAMEWORK_CHOICES)
+      :choices(MODULE_NAMES)
+      :default(MODULE_NAMES)
       :args("+")
    parser:option("--group", "Test groups to run"):choices(GROUP_NAMES):args("*")
    parser:option("--test", "Tests to run"):choices(ALL_TESTS):args("*")

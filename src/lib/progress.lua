@@ -14,6 +14,7 @@
 local chronos = require("chronos")
 local clear = require("terminal.clear")
 local cursor = require("terminal.cursor")
+local output = require("terminal.output")
 local terminal = require("terminal")
 
 local chronos_nanotime = chronos.nanotime
@@ -117,7 +118,7 @@ end
 
 --- Clear the current line and move cursor to start.
 local function _clear_line()
-   io.write("\r")
+   output.write("\r")
    clear.line()
 end
 
@@ -127,8 +128,7 @@ function ProgressBar:_render()
       return
    end
    _clear_line()
-   io.write(self:_format())
-   io.flush()
+   output.write(self:_format())
 end
 
 --- Initialize the terminal and start tracking time.
@@ -167,10 +167,9 @@ function ProgressBar:stop(final_msg)
    end
    _clear_line()
    if final_msg then
-      io.write(self:_format(final_msg))
+      output.write(self:_format(final_msg))
    end
-   io.write("\n")
-   io.flush()
+   output.write("\n")
    pcall(function()
       cursor.visible.set(true)
       terminal.shutdown()

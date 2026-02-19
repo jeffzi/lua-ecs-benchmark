@@ -12,22 +12,27 @@ RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 TIME = "s"
 MEMORY = "kb"
 
+TIME_NOISE_FLOOR = 1e-5  # 10µs — timer quantization floor
+MEMORY_NOISE_FLOOR = 1  # 1 KB — allocator granularity floor
+
 MUTATING_OPS = {"add", "remove", "set"}
 READONLY_OPS = {"get", "has"}
 
 _DEDICATED_PAIRS = (
     frozenset({"lua5.1", "luajit-on"}),
     frozenset({"lua5.1", "luajit-off"}),
+    frozenset({"luajit-off", "luajit-on"}),
 )
 
 BATCH_PAIRS: dict[str, str] = {
     "ecs-lua-nobatch": "ecs-lua-batch",
+    "evolved-nobatch": "evolved-batch",
     "lovetoys-nobatch": "lovetoys-batch",
 }
 
 
 # =============================================================================
-# Data Loading
+# Data Loadingbwbbbb
 # =============================================================================
 
 
@@ -114,11 +119,12 @@ def check_cross_interpreter_time(df: pl.DataFrame) -> int:
         label = f"{row['group']}/{row['test']} [{row['framework']}] entities={row['entities']}"
         values: dict[str, float] = {i: row[i] for i in interpreters if row.get(i) is not None}
 
-        # luajit-on slower than lua5.1 (only flag ≥1.5x to filter measurement noise)
-        if "luajit-on" in values and "lua5.1" in values:
-            ratio = values["luajit-on"] / values["lua5.1"]
-            if ratio >= 1.5:
-                findings.append(f"  {label}: luajit-on {ratio:.2f}x SLOWER than lua5.1")
+        # luajit-on should be fastest; flag ≥1.5x slower than any baseline
+        for baseline in ("lua5.1", "luajit-off"):
+            if "luajit-on" in values and baseline in values:
+                ratio = values["luajit-on"] / values[baseline]
+                if ratio >= 1.5:
+                    findings.append(f"  {label}: luajit-on {ratio:.2f}x SLOWER than {baseline}")
 
         if "luajit-off" in values and "lua5.1" in values:
             ratio = max(values["luajit-off"], values["lua5.1"]) / min(
@@ -159,6 +165,8 @@ def check_cross_interpreter_memory(df: pl.DataFrame) -> int:
         if len(positive) >= 2:
             max_val = max(positive.values())
             min_val = min(positive.values())
+            if max_val < MEMORY_NOISE_FLOOR:
+                continue
             ratio = max_val / min_val
             if ratio > 3:
                 findings.append(f"  {label}: memory max/min ratio={ratio:.2f}x")
@@ -180,11 +188,11 @@ def check_scaling_consistency(df: pl.DataFrame) -> int:
         medians = group_df["median"].to_list()
         entities = group_df["entities"].to_list()
 
-        noise_floor = 1e-5 if unit == TIME else 1  # 10µs for time, 1 KB for memory
+        noise_floor = TIME_NOISE_FLOOR if unit == TIME else MEMORY_NOISE_FLOOR
         for i in range(1, len(medians)):
             prev, curr = medians[i - 1], medians[i]
+            below_floor = prev < noise_floor and curr < noise_floor
             if prev > 0 and curr < prev:
-                below_floor = prev < noise_floor and curr < noise_floor
                 decrease_pct = (prev - curr) / prev
                 if below_floor and decrease_pct < 0.1:
                     continue
@@ -192,7 +200,7 @@ def check_scaling_consistency(df: pl.DataFrame) -> int:
                     f"  {label}: DECREASED {entities[i - 1]}->{entities[i]}"
                     f" ({prev:.4g}->{curr:.4g})",
                 )
-            if prev > 0 and curr > 0:
+            if prev > 0 and curr > 0 and not below_floor:
                 entity_ratio = entities[i] / entities[i - 1]
                 metric_ratio = curr / prev
                 if entity_ratio <= 100 and metric_ratio > 1000:
@@ -231,8 +239,9 @@ def check_ci_red_flags(df: pl.DataFrame) -> int:
                     findings.append(f"  {label}: CI collapsed (ratio={ci_ratio:.2e})")
 
             elif row["unit"] == MEMORY:
-                # Memory CI should be collapsed (deterministic allocation)
-                if ci_ratio > 0.1:
+                # Memory CI should be collapsed (deterministic allocation);
+                # below noise floor, allocator granularity makes jitter expected
+                if ci_ratio > 0.1 and median >= MEMORY_NOISE_FLOOR:
                     findings.append(f"  {label}: memory CI not collapsed (ratio={ci_ratio:.2f})")
 
     return _print_check("CI Red Flags", findings)

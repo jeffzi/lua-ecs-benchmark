@@ -107,8 +107,8 @@ def find_basename(name: str, frameworks: set[str]) -> str:
 
 
 def generate_variant_shades(hex_color: str, count: int) -> list[str]:
-    """Generate up to 3 shades of a base color for variants."""
-    multipliers = [1.0, 0.7, 0.5][:count]
+    """Generate shades of a base color for variants."""
+    multipliers = [1.0 - i * 0.6 / max(count - 1, 1) for i in range(count)]
     r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
     return [
         f"#{int(r + (255 - r) * (1 - m)):02x}"

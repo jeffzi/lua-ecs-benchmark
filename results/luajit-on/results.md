@@ -1,7 +1,7 @@
 # Benchmark Environment
 
 ```text
-OS: macOS 26.2
+OS: macOS 26.3
 CPU: Apple M2 Max
 Cores: 12 cores (12 threads)
 Max Frequency: 3.50 GHz
@@ -23,28 +23,28 @@ Memory: 64 GB
 
 | test                   | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata        | tinyecs     |
 | :--------------------- | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :---------- | :---------- |
-| create_empty           | 160 μs  | 55.9 μs              | 32.1 μs |               |                 | 43.8 μs  |                |                  | **15.9 μs** | 24.1 μs     |
-| create_with_components | 129 μs  | 85.1 μs              |         | 104 μs        | 134 μs          | 112 μs   |                |                  | **18.7 μs** | 26.2 μs     |
-| destroy                | 47.1 μs | 65.5 μs              | 19.8 μs |               |                 | 123 μs   |                |                  | 8.71 μs     | **4.62 μs** |
+| create_empty           | 440 μs  | 119 μs               | 47.5 μs |               |                 | 35.3 μs  |                |                  | **16.2 μs** | 24.4 μs     |
+| create_with_components | 633 μs  | 504 μs               |         | 129 μs        | 125 μs          | 126 μs   |                |                  | **19.1 μs** | 26.9 μs     |
+| destroy                | 133 μs  | 102 μs               | 20.3 μs |               |                 | 122 μs   |                |                  | 9.38 μs     | **4.67 μs** |
 
 #### Memory Usage
 
 | test                   | concord  | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata    | tinyecs     |
 | :--------------------- | :------- | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :------ | :---------- |
-| create_empty           | 51.2 kB  | 26.9 kB              | 82.3 kB |               |                 | 64.2 kB  |                |                  | 22.2 kB | **20.0 kB** |
-| create_with_components | 101.2 kB | 76.2 kB              |         | 174.5 kB      | 193.2 kB        | 110.1 kB |                |                  | 37.9 kB | **35.0 kB** |
-| destroy                | 5.5 kB   | 4.0 kB               | 11.3 kB |               |                 | **0 B**  |                |                  | 3.2 kB  | 1.1 kB      |
+| create_empty           | 51.2 kB  | 26.9 kB              | 82.3 kB |               |                 | 58.0 kB  |                |                  | 22.2 kB | **19.4 kB** |
+| create_with_components | 101.2 kB | 76.2 kB              |         | 174.5 kB      | 193.3 kB        | 103.8 kB |                |                  | 37.9 kB | **35.0 kB** |
+| destroy                | 4.0 kB   | 4.0 kB               | 11.3 kB |               |                 | **0 B**  |                |                  | 3.2 kB  | 1.1 kB      |
 
 ### Component
 
 #### Execution Time
 
-| test   | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata    | tinyecs     |
-| :----- | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :------ | :---------- |
-| get    | 500 ns  | 417 ns               | 1.83 μs |               |                 | 875 ns   |                |                  | 292 ns  | **250 ns**  |
-| set    | 542 ns  | 500 ns               | 1.92 μs |               |                 | 958 ns   |                |                  | 292 ns  | **250 ns**  |
-| add    | 57.2 μs | 119 μs               |         | 66.8 μs       | 83.7 μs         |          | 56.2 μs        | 46.0 μs          | 4.67 μs | **3.67 μs** |
-| remove | 43.6 μs | 133 μs               | 38.8 μs |               |                 | 30.7 μs  |                |                  | 2.04 μs | **1.79 μs** |
+| test   | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata       | tinyecs     |
+| :----- | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :--------- | :---------- |
+| get    | 625 ns  | 542 ns               | 1.83 μs |               |                 | 833 ns   |                |                  | **292 ns** | 292 ns      |
+| set    | 667 ns  | 583 ns               | 1.92 μs |               |                 | 875 ns   |                |                  | **208 ns** | 250 ns      |
+| add    | 247 μs  | 180 μs               |         | 71.1 μs       | 73.9 μs         |          | 48.0 μs        | 44.9 μs          | 4.71 μs    | **3.58 μs** |
+| remove | 775 μs  | 572 μs               | 38.3 μs |               |                 | 29.1 μs  |                |                  | 2.12 μs    | **1.75 μs** |
 
 #### Memory Usage
 
@@ -61,9 +61,9 @@ Memory: 64 GB
 
 | test   | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata       | tinyecs     |
 | :----- | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :--------- | :---------- |
-| has    | 458 ns  | 417 ns               | 1.58 μs |               |                 | 333 ns   |                |                  | **125 ns** | 125 ns      |
-| add    | 41.8 μs | 115 μs               |         | 55.7 μs       | 65.4 μs         |          | 50.0 μs        | 44.5 μs          | 3.50 μs    | **2.71 μs** |
-| remove | 52.8 μs | 50.3 μs              | 43.9 μs |               |                 | 31.2 μs  |                |                  | 2.06 μs    | **1.79 μs** |
+| has    | 500 ns  | 417 ns               | 1.29 μs |               |                 | 333 ns   |                |                  | **125 ns** | 125 ns      |
+| add    | 204 μs  | 155 μs               |         | 56.3 μs       | 62.6 μs         |          | 45.6 μs        | 42.3 μs          | 3.25 μs    | **2.58 μs** |
+| remove | 707 μs  | 683 μs               | 38.5 μs |               |                 | 29.9 μs  |                |                  | 2.00 μs    | **1.58 μs** |
 
 #### Memory Usage
 
@@ -77,14 +77,14 @@ Memory: 64 GB
 
 #### Execution Time
 
-| test          | concord    | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata    | tinyecs     |
-| :------------ | :--------- | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :------ | :---------- |
-| throughput    | 750 ns     |                      | 5.65 μs |               |                 | 1.58 μs  |                |                  | 500 ns  | **417 ns**  |
-| overlap       | **708 ns** |                      | 12.3 μs |               |                 | 1.71 μs  |                |                  | 750 ns  | 917 ns      |
-| fragmented    | 500 ns     |                      | 13.8 μs |               |                 | 792 ns   |                |                  | 458 ns  | **417 ns**  |
-| chained       | 2.19 μs    |                      | 25.0 μs |               |                 | 4.25 μs  |                |                  | 1.46 μs | **1.21 μs** |
-| multi_20      | 7.21 μs    |                      | 67.9 μs |               |                 | 15.5 μs  |                |                  | 5.88 μs | **4.96 μs** |
-| empty_systems | 1.21 μs    |                      | 2.46 μs |               |                 | 708 ns   |                |                  | 958 ns  | **292 ns**  |
+| test          | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata       | tinyecs     |
+| :------------ | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :--------- | :---------- |
+| throughput    | 958 ns  |                      | 5.17 μs |               |                 | 1.50 μs  |                |                  | **375 ns** | 417 ns      |
+| overlap       | 2.46 μs |                      | 12.2 μs |               |                 | 1.71 μs  |                |                  | **708 ns** | 1.54 μs     |
+| fragmented    | 1.12 μs |                      | 7.58 μs |               |                 | 833 ns   |                |                  | 333 ns     | **292 ns**  |
+| chained       | 3.00 μs |                      | 22.1 μs |               |                 | 4.25 μs  |                |                  | 1.25 μs    | **1.12 μs** |
+| multi_20      | 12.9 μs |                      | 66.9 μs |               |                 | 17.5 μs  |                |                  | 5.63 μs    | **5.04 μs** |
+| empty_systems | 1.79 μs |                      | 2.67 μs |               |                 | 750 ns   |                |                  | 958 ns     | **250 ns**  |
 
 #### Memory Usage
 
@@ -103,18 +103,18 @@ Memory: 64 GB
 
 #### Execution Time
 
-| test                   | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata        | tinyecs |
-| :--------------------- | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :---------- | :------ |
-| create_empty           | 754 μs  | 333 μs               | 553 μs  |               |                 | 352 μs   |                |                  | **43.8 μs** | 125 μs  |
-| create_with_components | 3.62 ms | 1.02 ms              |         | 1.39 ms       | 1.43 ms         | 1.30 ms  |                |                  | **71.8 μs** | 154 μs  |
-| destroy                | 744 μs  | 344 μs               | 130 μs  |               |                 | 10.6 ms  |                |                  | **88.6 μs** | 156 μs  |
+| test                   | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata        | tinyecs    |
+| :--------------------- | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :---------- | :--------- |
+| create_empty           | 1.72 ms | 744 μs               | 551 μs  |               |                 | 586 μs   |                |                  | **42.4 μs** | 123 μs     |
+| create_with_components | 3.38 ms | 2.30 ms              |         | 1.28 ms       | 1.84 ms         | 1.27 ms  |                |                  | 512 μs      | **154 μs** |
+| destroy                | 1.01 ms | 601 μs               | 123 μs  |               |                 | 10.8 ms  |                |                  | **86.2 μs** | 117 μs     |
 
 #### Memory Usage
 
 | test                   | concord  | concord-no-serialize | ecs-lua  | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata         | tinyecs  |
 | :--------------------- | :------- | :------------------- | :------- | :------------ | :-------------- | :------- | :------------- | :--------------- | :----------- | :------- |
-| create_empty           | 376.4 kB | 141.3 kB             | 667.6 kB |               |                 | 562.5 kB |                |                  | **62.5 kB**  | 71.4 kB  |
-| create_with_components | 876.4 kB | 626.4 kB             |          | 1.6 MB        | 1.8 MB          | 1.0 MB   |                |                  | **218.8 kB** | 226.9 kB |
+| create_empty           | 376.4 kB | 141.3 kB             | 667.7 kB |               |                 | 500.0 kB |                |                  | **62.5 kB**  | 70.6 kB  |
+| create_with_components | 876.4 kB | 626.4 kB             |          | 1.6 MB        | 1.8 MB          | 946.4 kB |                |                  | **218.8 kB** | 226.9 kB |
 | destroy                | 32.0 kB  | 32.0 kB              | 81.3 kB  |               |                 | **0 B**  |                |                  | 24.2 kB      | 8.1 kB   |
 
 ### Component
@@ -123,10 +123,10 @@ Memory: 64 GB
 
 | test   | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata        | tinyecs     |
 | :----- | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :---------- | :---------- |
-| get    | 6.38 μs | 5.48 μs              | 27.7 μs |               |                 | 8.77 μs  |                |                  | 4.25 μs     | **4.08 μs** |
-| set    | 7.00 μs | 5.88 μs              | 21.6 μs |               |                 | 9.67 μs  |                |                  | **4.33 μs** | 4.38 μs     |
-| add    | 1.23 ms | 699 μs               |         | 793 μs        | 892 μs          |          | 571 μs         | 522 μs           | 51.8 μs     | **36.7 μs** |
-| remove | 1.01 ms | 388 μs               | 364 μs  |               |                 | 321 μs   |                |                  | 20.3 μs     | **13.7 μs** |
+| get    | 12.2 μs | 12.1 μs              | 21.7 μs |               |                 | 8.88 μs  |                |                  | 4.46 μs     | **4.29 μs** |
+| set    | 13.8 μs | 13.3 μs              | 21.6 μs |               |                 | 9.75 μs  |                |                  | **4.50 μs** | 4.50 μs     |
+| add    | 656 μs  | 693 μs               |         | 641 μs        | 642 μs          |          | 472 μs         | 473 μs           | 51.5 μs     | **36.5 μs** |
+| remove | 1.04 ms | 621 μs               | 351 μs  |               |                 | 290 μs   |                |                  | 19.0 μs     | **13.9 μs** |
 
 #### Memory Usage
 
@@ -143,9 +143,9 @@ Memory: 64 GB
 
 | test   | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata        | tinyecs     |
 | :----- | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :---------- | :---------- |
-| has    | 5.33 μs | 4.33 μs              | 17.3 μs |               |                 | 3.25 μs  |                |                  | **2.17 μs** | 2.25 μs     |
-| add    | 1.51 ms | 337 μs               |         | 660 μs        | 760 μs          |          | 549 μs         | 481 μs           | 40.6 μs     | **26.4 μs** |
-| remove | 432 μs  | 918 μs               | 393 μs  |               |                 | 327 μs   |                |                  | 20.8 μs     | **13.5 μs** |
+| has    | 25.8 μs | 19.0 μs              | 13.2 μs |               |                 | 3.25 μs  |                |                  | **2.17 μs** | 2.21 μs     |
+| add    | 640 μs  | 672 μs               |         | 499 μs        | 542 μs          |          | 472 μs         | 442 μs           | 37.8 μs     | **25.2 μs** |
+| remove | 1.03 ms | 648 μs               | 347 μs  |               |                 | 306 μs   |                |                  | 20.9 μs     | **14.3 μs** |
 
 #### Memory Usage
 
@@ -161,12 +161,12 @@ Memory: 64 GB
 
 | test          | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata        | tinyecs     |
 | :------------ | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :---------- | :---------- |
-| throughput    | 9.38 μs |                      | 45.7 μs |               |                 | 15.5 μs  |                |                  | 5.04 μs     | **5.02 μs** |
-| overlap       | 10.1 μs |                      | 110 μs  |               |                 | 19.9 μs  |                |                  | **9.02 μs** | 10.9 μs     |
-| fragmented    | 5.71 μs |                      | 98.9 μs |               |                 | 10.9 μs  |                |                  | **4.08 μs** | 5.08 μs     |
-| chained       | 27.6 μs |                      | 298 μs  |               |                 | 49.1 μs  |                |                  | 26.3 μs     | **25.6 μs** |
-| multi_20      | 82.1 μs |                      | 812 μs  |               |                 | 206 μs   |                |                  | 65.6 μs     | **63.0 μs** |
-| empty_systems | 1.21 μs |                      | 3.00 μs |               |                 | 667 ns   |                |                  | 958 ns      | **292 ns**  |
+| throughput    | 9.75 μs |                      | 32.9 μs |               |                 | 15.6 μs  |                |                  | 5.00 μs     | **4.96 μs** |
+| overlap       | 10.5 μs |                      | 85.5 μs |               |                 | 21.3 μs  |                |                  | **9.79 μs** | 9.88 μs     |
+| fragmented    | 7.42 μs |                      | 27.0 μs |               |                 | 11.3 μs  |                |                  | **4.00 μs** | 4.04 μs     |
+| chained       | 26.5 μs |                      | 174 μs  |               |                 | 50.3 μs  |                |                  | **25.5 μs** | 26.1 μs     |
+| multi_20      | 168 μs  |                      | 571 μs  |               |                 | 201 μs   |                |                  | 65.4 μs     | **64.6 μs** |
+| empty_systems | 1.92 μs |                      | 3.46 μs |               |                 | 750 ns   |                |                  | 958 ns      | **292 ns**  |
 
 #### Memory Usage
 
@@ -187,17 +187,17 @@ Memory: 64 GB
 
 | test                   | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata        | tinyecs    |
 | :--------------------- | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :---------- | :--------- |
-| create_empty           | 6.62 ms | 3.96 ms              | 2.58 ms |               |                 | 3.69 ms  |                |                  | **956 μs**  | 984 μs     |
-| create_with_components | 33.1 ms | 8.66 ms              |         | 9.70 ms       | 14.1 ms         | 13.6 ms  |                |                  | **1.74 ms** | 2.22 ms    |
-| destroy                | 11.8 ms | 11.7 ms              | 1.99 ms |               |                 | 1.12 s   |                |                  | 796 μs      | **520 μs** |
+| create_empty           | 7.77 ms | 4.23 ms              | 3.22 ms |               |                 | 6.02 ms  |                |                  | **1.04 ms** | 1.09 ms    |
+| create_with_components | 13.9 ms | 10.00 ms             |         | 9.73 ms       | 18.5 ms         | 13.0 ms  |                |                  | **1.82 ms** | 2.40 ms    |
+| destroy                | 3.69 ms | 3.78 ms              | 1.87 ms |               |                 | 1.22 s   |                |                  | 791 μs      | **514 μs** |
 
 #### Memory Usage
 
 | test                   | concord  | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata         | tinyecs  |
 | :--------------------- | :------- | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :----------- | :------- |
-| create_empty           | 4.0 MB   | 1.5 MB               | 7.1 MB  |               |                 | 5.6 MB   |                |                  | **625.0 kB** | 754.2 kB |
-| create_with_components | 9.0 MB   | 6.5 MB               |         | 16.4 MB       | 18.2 MB         | 9.9 MB   |                |                  | **2.2 MB**   | 2.3 MB   |
-| destroy                | 448.8 kB | 448.0 kB             | 1.3 MB  |               |                 | **0 B**  |                |                  | 384.2 kB     | 128.1 kB |
+| create_empty           | 4.0 MB   | 1.5 MB               | 7.1 MB  |               |                 | 5.0 MB   |                |                  | **625.0 kB** | 753.1 kB |
+| create_with_components | 9.0 MB   | 6.5 MB               |         | 16.4 MB       | 18.2 MB         | 9.2 MB   |                |                  | **2.2 MB**   | 2.3 MB   |
+| destroy                | 448.0 kB | 448.0 kB             | 1.3 MB  |               |                 | **0 B**  |                |                  | 384.2 kB     | 128.1 kB |
 
 ### Component
 
@@ -205,10 +205,10 @@ Memory: 64 GB
 
 | test   | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata        | tinyecs    |
 | :----- | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :---------- | :--------- |
-| get    | 256 μs  | 238 μs               | 1.34 ms |               |                 | 268 μs   |                |                  | **74.4 μs** | 81.9 μs    |
-| set    | 258 μs  | 251 μs               | 1.56 ms |               |                 | 275 μs   |                |                  | **77.7 μs** | 80.4 μs    |
-| add    | 5.84 ms | 33.9 ms              |         | 8.61 ms       | 10.8 ms         |          | 6.12 ms        | 5.57 ms          | **1.14 ms** | 1.42 ms    |
-| remove | 20.2 ms | 21.0 ms              | 7.14 ms |               |                 | 3.62 ms  |                |                  | 235 μs      | **131 μs** |
+| get    | 249 μs  | 209 μs               | 1.14 ms |               |                 | 242 μs   |                |                  | **78.2 μs** | 87.3 μs    |
+| set    | 258 μs  | 222 μs               | 1.26 ms |               |                 | 200 μs   |                |                  | **47.7 μs** | 54.2 μs    |
+| add    | 4.44 ms | 4.35 ms              |         | 8.57 ms       | 8.43 ms         |          | 5.50 ms        | 5.05 ms          | **1.07 ms** | 1.40 ms    |
+| remove | 5.37 ms | 4.89 ms              | 6.23 ms |               |                 | 3.13 ms  |                |                  | 211 μs      | **133 μs** |
 
 #### Memory Usage
 
@@ -225,9 +225,9 @@ Memory: 64 GB
 
 | test   | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata        | tinyecs    |
 | :----- | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :---------- | :--------- |
-| has    | 166 μs  | 176 μs               | 783 μs  |               |                 | 150 μs   |                |                  | **48.0 μs** | 51.5 μs    |
-| add    | 8.81 ms | 32.1 ms              |         | 7.13 ms       | 9.28 ms         |          | 5.85 ms        | 5.24 ms          | 499 μs      | **306 μs** |
-| remove | 37.5 ms | 16.4 ms              | 7.42 ms |               |                 | 3.60 ms  |                |                  | 241 μs      | **130 μs** |
+| has    | 170 μs  | 163 μs               | 655 μs  |               |                 | 108 μs   |                |                  | **45.6 μs** | 51.7 μs    |
+| add    | 4.17 ms | 4.02 ms              |         | 6.80 ms       | 7.32 ms         |          | 5.21 ms        | 4.74 ms          | 465 μs      | **293 μs** |
+| remove | 5.24 ms | 4.79 ms              | 6.13 ms |               |                 | 3.38 ms  |                |                  | 245 μs      | **134 μs** |
 
 #### Memory Usage
 
@@ -241,14 +241,14 @@ Memory: 64 GB
 
 #### Execution Time
 
-| test          | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata        | tinyecs    |
-| :------------ | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :---------- | :--------- |
-| throughput    | 121 μs  |                      | 1.36 ms |               |                 | 165 μs   |                |                  | **48.5 μs** | 49.6 μs    |
-| overlap       | 192 μs  |                      | 3.12 ms |               |                 | 273 μs   |                |                  | **89.4 μs** | 93.0 μs    |
-| fragmented    | 97.8 μs |                      | 2.29 ms |               |                 | 142 μs   |                |                  | **38.5 μs** | 42.7 μs    |
-| chained       | 706 μs  |                      | 9.24 ms |               |                 | 1.07 ms  |                |                  | **298 μs**  | 307 μs     |
-| multi_20      | 2.79 ms |                      | 33.1 ms |               |                 | 4.63 ms  |                |                  | **1.24 ms** | 1.40 ms    |
-| empty_systems | 1.29 μs |                      | 4.58 μs |               |                 | 667 ns   |                |                  | 958 ns      | **333 ns** |
+| test          | concord | concord-no-serialize | ecs-lua | ecs-lua-batch | ecs-lua-nobatch | lovetoys | lovetoys-batch | lovetoys-nobatch | nata        | tinyecs     |
+| :------------ | :------ | :------------------- | :------ | :------------ | :-------------- | :------- | :------------- | :--------------- | :---------- | :---------- |
+| throughput    | 125 μs  |                      | 1.04 ms |               |                 | 185 μs   |                |                  | 49.8 μs     | **49.8 μs** |
+| overlap       | 194 μs  |                      | 2.78 ms |               |                 | 300 μs   |                |                  | **99.3 μs** | 100 μs      |
+| fragmented    | 97.3 μs |                      | 815 μs  |               |                 | 125 μs   |                |                  | 39.6 μs     | **39.2 μs** |
+| chained       | 692 μs  |                      | 6.50 ms |               |                 | 931 μs   |                |                  | **293 μs**  | 304 μs      |
+| multi_20      | 2.71 ms |                      | 22.2 ms |               |                 | 4.50 ms  |                |                  | **1.18 ms** | 1.28 ms     |
+| empty_systems | 8.04 μs |                      | 4.88 μs |               |                 | 750 ns   |                |                  | 958 ns      | **292 ns**  |
 
 #### Memory Usage
 

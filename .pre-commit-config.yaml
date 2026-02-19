@@ -51,7 +51,7 @@ repos:
 
   # Python type checking
   - repo: https://github.com/DetachHead/basedpyright-prek-mirror
-    rev: 1.38.0
+    rev: 1.38.1
     hooks:
       - id: basedpyright
 
@@ -66,7 +66,7 @@ repos:
 
   # Markdown linting
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.20.0
+    rev: v0.21.0
     hooks:
       - id: markdownlint-cli2
         exclude: ^results/plots/README\.md$
@@ -79,7 +79,7 @@ repos:
 
   # Conventional commit messages
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v4.3.0
+    rev: v4.4.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]

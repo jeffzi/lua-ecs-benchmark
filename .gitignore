@@ -1,3 +1,10 @@
+openspec/
+.claude/
+CLAUDE.md
+todo.md
+scripts/run-all-benchmarks.sh
+scripts/fan-control*
+tests/*
 # Compiled Lua sources
 luac.out
 

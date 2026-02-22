@@ -12,15 +12,12 @@ local evo_get = evo.get
 local evo_set = evo.set
 local evo_has = evo.has
 local evo_remove = evo.remove
-local evo_alive = evo.alive
 local evo_builder = evo.builder
 local evo_process_with = evo.process_with
 local evo_multi_spawn = evo.multi_spawn
 local evo_batch_set = evo.batch_set
 local evo_batch_remove = evo.batch_remove
 local evo_batch_destroy = evo.batch_destroy
-local evo_defer = evo.defer
-local evo_commit = evo.commit
 
 local DT = config.DT
 local WORLD_MULTIPLIER = config.WORLD_MULTIPLIER
@@ -118,23 +115,21 @@ local function create_world_with_query(query_frags, make_entity)
    end
 end
 
---- Destroy all tracked entities, checking alive status first.
+--- Destroy all tracked entities.
 --- @param ctx table Context with entities, background, created, and systems lists.
 local function clear_world(ctx)
    local lists = { ctx.entities, ctx.background, ctx.created, ctx.systems }
    for _, list in ipairs(lists) do
       if list then
          for i = 1, #list do
-            if evo_alive(list[i]) then
-               evo_destroy(list[i])
-            end
+            evo_destroy(list[i])
          end
       end
    end
-   if ctx.query and evo_alive(ctx.query) then
+   if ctx.query then
       evo_destroy(ctx.query)
    end
-   if ctx.stage and evo_alive(ctx.stage) then
+   if ctx.stage then
       evo_destroy(ctx.stage)
    end
    ctx.entities = nil
@@ -200,12 +195,12 @@ local set = {
 local nobatch_create_with_components = {
    fn = function(ctx, p)
       local created = {}
+      local b = evo_builder()
+      b:set(Position_x, 0)
+      b:set(Position_y, 0)
+      b:set(Alive, true)
       for i = 1, p.n_entities do
-         created[i] = evo_spawn({
-            [Position_x] = 0,
-            [Position_y] = 0,
-            [Alive] = true,
-         })
+         created[i] = b:build()
       end
       ctx.created = created
    end,
@@ -295,71 +290,6 @@ local batch_remove = {
 }
 
 -- ----------------------------------------------------------------------------
--- Deferred Tests (per-entity ops inside defer/commit scope)
--- ----------------------------------------------------------------------------
-
---- @type luamark.Spec
-local deferred_create_with_components = {
-   fn = function(ctx, p)
-      local created = {}
-      evo_defer()
-      for i = 1, p.n_entities do
-         created[i] = evo_spawn({
-            [Position_x] = 0,
-            [Position_y] = 0,
-            [Alive] = true,
-         })
-      end
-      evo_commit()
-      ctx.created = created
-   end,
-   before = create_world(),
-   after = clear_world,
-}
-
---- @type luamark.Spec
-local deferred_destroy = {
-   fn = function(ctx)
-      local entities = ctx.entities
-      evo_defer()
-      for i = 1, #entities do
-         evo_destroy(entities[i])
-      end
-      evo_commit()
-   end,
-   before = create_world(),
-   after = clear_world,
-}
-
---- @type luamark.Spec
-local deferred_add = {
-   fn = function(ctx)
-      local entities = ctx.entities
-      evo_defer()
-      for i = 1, #entities do
-         evo_set(entities[i], Name_value, "monster")
-      end
-      evo_commit()
-   end,
-   before = create_world(),
-   after = clear_world,
-}
-
---- @type luamark.Spec
-local deferred_remove = {
-   fn = function(ctx)
-      local entities = ctx.entities
-      evo_defer()
-      for i = 1, #entities do
-         evo_remove(entities[i], Velocity_x, Velocity_y)
-      end
-      evo_commit()
-   end,
-   before = create_world(),
-   after = clear_world,
-}
-
--- ----------------------------------------------------------------------------
 -- Tag Tests
 -- ----------------------------------------------------------------------------
 
@@ -394,34 +324,6 @@ local nobatch_tag_remove = {
       for i = 1, #entities do
          evo_remove(entities[i], Alive)
       end
-   end,
-   before = create_world(),
-   after = clear_world,
-}
-
---- @type luamark.Spec
-local deferred_tag_add = {
-   fn = function(ctx)
-      local entities = ctx.entities
-      evo_defer()
-      for i = 1, #entities do
-         evo_set(entities[i], Aggro)
-      end
-      evo_commit()
-   end,
-   before = create_world(),
-   after = clear_world,
-}
-
---- @type luamark.Spec
-local deferred_tag_remove = {
-   fn = function(ctx)
-      local entities = ctx.entities
-      evo_defer()
-      for i = 1, #entities do
-         evo_remove(entities[i], Alive)
-      end
-      evo_commit()
    end,
    before = create_world(),
    after = clear_world,
@@ -784,14 +686,6 @@ return {
          },
          component = { add = batch_add, remove = batch_remove },
          tag = { add = batch_tag_add, remove = batch_tag_remove },
-      },
-      ["evolved-deferred"] = {
-         entity = {
-            create_with_components = deferred_create_with_components,
-            destroy = deferred_destroy,
-         },
-         component = { add = deferred_add, remove = deferred_remove },
-         tag = { add = deferred_tag_add, remove = deferred_tag_remove },
       },
    },
 }

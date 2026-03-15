@@ -1,7 +1,7 @@
 # Benchmark Plots
 
 ```text
-OS: macOS 26.3
+OS: macOS 26.3.1
 CPU: Apple M2 Max
 Cores: 12 cores (12 threads)
 Max Frequency: 3.50 GHz
@@ -14,6 +14,7 @@ Memory rows are omitted from charts when all frameworks report zero allocation f
 - **[Component](#component):** [get](#component-get) · [set](#component-set) · [add](#component-add) · [remove](#component-remove)
 - **[Tag](#tag):** [has](#tag-has) · [add](#tag-add) · [remove](#tag-remove)
 - **[System](#system):** [throughput](#system-throughput) · [overlap](#system-overlap) · [fragmented](#system-fragmented) · [chained](#system-chained) · [multi_20](#system-multi_20) · [empty_systems](#system-empty_systems)
+- **[Structural_Scaling](#structural_scaling):** [create](#structural_scaling-create) · [add_component](#structural_scaling-add_component) · [destroy](#structural_scaling-destroy)
 
 #### Entity
 
@@ -118,3 +119,23 @@ Memory rows are omitted from charts when all frameworks report zero allocation f
 ##### empty_systems
 
 ![empty_systems Plot](system/empty_systems.svg)
+
+#### Structural_Scaling
+
+<a id="structural_scaling-create"></a>
+
+##### create
+
+![create Plot](structural_scaling/create.svg)
+
+<a id="structural_scaling-add_component"></a>
+
+##### add_component
+
+![add_component Plot](structural_scaling/add_component.svg)
+
+<a id="structural_scaling-destroy"></a>
+
+##### destroy
+
+![destroy Plot](structural_scaling/destroy.svg)

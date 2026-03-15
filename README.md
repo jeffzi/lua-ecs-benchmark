@@ -20,14 +20,15 @@ benchmarking tool for Lua.
 
 ## Benchmark Tests
 
-16 tests across 4 groups, each run at 4 entity scales (100, 1,000, 10,000, 50,000):
+19 tests across 5 groups, each run at 3 entity scales (100, 1,000, 10,000):
 
-| Group         | Tests | Measures                                            |
-| :------------ | ----: | :-------------------------------------------------- |
-| **Entity**    |     3 | Creation, destruction, allocation cost              |
-| **Component** |     4 | Field read/write, insertion, removal                |
-| **Tag**       |     3 | Presence check, insertion, removal                  |
-| **System**    |     6 | Iteration throughput, scheduling, dispatch overhead |
+| Group                  | Tests | Measures                                            |
+| :--------------------- | ----: | :-------------------------------------------------- |
+| **Entity**             |     3 | Creation, destruction, allocation cost              |
+| **Component**          |     4 | Field read/write, insertion, removal                |
+| **Tag**                |     3 | Presence check, insertion, removal                  |
+| **System**             |     6 | Iteration throughput, scheduling, dispatch overhead |
+| **Structural Scaling** |     3 | Structural ops with 20 registered systems           |
 
 Each test reports median execution time and memory consumption.
 See [specifications](docs/specifications.md) for full test definitions

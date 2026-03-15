@@ -22,6 +22,7 @@ local evo_batch_destroy = evo.batch_destroy
 local DT = config.DT
 local WORLD_MULTIPLIER = config.WORLD_MULTIPLIER
 local N_BUFFS = config.N_BUFFS
+local N_SYSTEMS = config.N_SYSTEMS
 
 -- ----------------------------------------------------------------------------
 -- Fragment Definitions (component types, created once at module load)
@@ -659,6 +660,139 @@ local system = {
 }
 
 -- ----------------------------------------------------------------------------
+-- Structural Scaling Tests
+-- ----------------------------------------------------------------------------
+
+--- Factory: returns a `before` that creates a populated world with N_SYSTEMS background systems.
+--- @param make_entity? fun(): table Factory for tracked entities.
+--- @return fun(_ctx: table, p: { n_entities: number }): table
+local function create_scaling_world(make_entity)
+   make_entity = make_entity
+      or function()
+         return {
+            [Position_x] = 0.0,
+            [Position_y] = 0.0,
+            [Velocity_x] = 0.0,
+            [Velocity_y] = 0.0,
+            [Alive] = true,
+         }
+      end
+   return function(_ctx, p)
+      local stage = evo_id()
+      local systems = {}
+
+      for _ = 1, N_SYSTEMS do
+         systems[#systems + 1] = evo_builder()
+            :group(stage)
+            :include(Position_x, Position_y, Velocity_x, Velocity_y)
+            :execute(function() end)
+            :build()
+      end
+
+      local background = {}
+      for i = 1, p.n_entities * (WORLD_MULTIPLIER - 1) do
+         background[i] = evo_spawn({
+            [Health_current] = 100,
+            [Health_max] = 100,
+            [Name_value] = "monster",
+            [Aggro] = true,
+         })
+      end
+
+      local entities = {}
+      for i = 1, p.n_entities do
+         entities[i] = evo_spawn(make_entity())
+      end
+
+      shuffle(entities)
+      return { entities = entities, background = background, stage = stage, systems = systems }
+   end
+end
+
+--- @type luamark.Spec
+local nobatch_scaling_create = {
+   fn = function(ctx, p)
+      local created = {}
+      local b = evo_builder()
+      b:set(Position_x, 0)
+      b:set(Position_y, 0)
+      b:set(Alive, true)
+      for i = 1, p.n_entities do
+         created[i] = b:build()
+      end
+      ctx.created = created
+   end,
+   before = create_scaling_world(),
+   after = clear_world,
+}
+
+--- @type luamark.Spec
+local batch_scaling_create = {
+   fn = function(ctx, p)
+      local entity_list = evo_multi_spawn(p.n_entities, {
+         [Position_x] = 0,
+         [Position_y] = 0,
+         [Alive] = true,
+      })
+      ctx.created = entity_list
+   end,
+   before = create_scaling_world(),
+   after = clear_world,
+}
+
+--- @type luamark.Spec
+local nobatch_scaling_add_component = {
+   fn = function(ctx)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         evo_set(entities[i], Name_value, "monster")
+      end
+   end,
+   before = create_scaling_world(),
+   after = clear_world,
+}
+
+--- @type luamark.Spec
+local batch_scaling_add_component = {
+   fn = function(ctx)
+      evo_batch_set(ctx.query, Name_value, "monster")
+   end,
+   before = function(ctx, p)
+      local base_before = create_scaling_world()
+      local result = base_before(ctx, p)
+      result.query = evo_builder():include(tbl_unpack({ Position_x })):build()
+      return result
+   end,
+   after = clear_world,
+}
+
+--- @type luamark.Spec
+local nobatch_scaling_destroy = {
+   fn = function(ctx)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         evo_destroy(entities[i])
+      end
+   end,
+   before = create_scaling_world(),
+   after = clear_world,
+}
+
+--- @type luamark.Spec
+local batch_scaling_destroy = {
+   fn = function(ctx)
+      evo_batch_destroy(ctx.query)
+   end,
+   before = function(ctx, p)
+      local base_before = create_scaling_world()
+      local result = base_before(ctx, p)
+      result.query = evo_builder():include(tbl_unpack({ Position_x })):build()
+      return result
+   end,
+   after = clear_world,
+}
+
+-- ----------------------------------------------------------------------------
 -- Module Export
 -- ----------------------------------------------------------------------------
 
@@ -678,6 +812,11 @@ return {
          },
          component = { add = nobatch_add, remove = nobatch_remove },
          tag = { add = nobatch_tag_add, remove = nobatch_tag_remove },
+         structural_scaling = {
+            create = nobatch_scaling_create,
+            add_component = nobatch_scaling_add_component,
+            destroy = nobatch_scaling_destroy,
+         },
       },
       ["evolved-batch"] = {
          entity = {
@@ -686,6 +825,11 @@ return {
          },
          component = { add = batch_add, remove = batch_remove },
          tag = { add = batch_tag_add, remove = batch_tag_remove },
+         structural_scaling = {
+            create = batch_scaling_create,
+            add_component = batch_scaling_add_component,
+            destroy = batch_scaling_destroy,
+         },
       },
    },
 }

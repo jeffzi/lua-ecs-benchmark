@@ -16,6 +16,7 @@ local tiny_world = tiny.world
 
 local DT = config.DT
 local WORLD_MULTIPLIER = config.WORLD_MULTIPLIER
+local N_SYSTEMS = config.N_SYSTEMS
 
 -- ----------------------------------------------------------------------------
 -- Setup
@@ -219,6 +220,90 @@ local tag = {
          tiny_refresh(world)
       end,
       before = create_world(),
+      after = clear_world,
+   },
+}
+
+-- ----------------------------------------------------------------------------
+-- Structural Scaling Tests
+-- ----------------------------------------------------------------------------
+
+--- Factory: returns a `before` that creates a populated world with N_SYSTEMS background systems.
+--- @param make_entity? fun(): table Factory for tracked entities.
+--- @return fun(_ctx: table, p: { n_entities: number }): { world: table, entities: table[] }
+local function create_scaling_world(make_entity)
+   make_entity = make_entity or make_default_entity
+   return function(_ctx, p)
+      local world = tiny_world()
+
+      for _ = 1, N_SYSTEMS do
+         local sys = tiny_processingSystem()
+         sys.filter = tiny_requireAll("Position", "Velocity")
+         function sys:process(_e, _dt) end
+         tiny_addSystem(world, sys)
+      end
+
+      -- Background entities
+      for _ = 1, p.n_entities * (WORLD_MULTIPLIER - 1) do
+         tiny_addEntity(world, {
+            Health = { current = 100, max = 100 },
+            Name = { value = "monster" },
+            Aggro = true,
+         })
+      end
+
+      -- Tracked entities for test operations
+      local entities = {}
+      for i = 1, p.n_entities do
+         entities[i] = tiny_addEntity(world, make_entity())
+      end
+
+      shuffle(entities)
+      tiny_refresh(world)
+      return { world = world, entities = entities }
+   end
+end
+
+--- @type BenchmarkTests
+local structural_scaling = {
+   create = {
+      fn = function(ctx, p)
+         local world = ctx.world
+         for _ = 1, p.n_entities do
+            tiny_addEntity(world, {
+               Position = { x = 0, y = 0 },
+               Alive = true,
+            })
+         end
+         tiny_refresh(world)
+      end,
+      before = create_scaling_world(),
+      after = clear_world,
+   },
+
+   add_component = {
+      fn = function(ctx)
+         local world, entities = ctx.world, ctx.entities
+         for i = 1, #entities do
+            local e = entities[i]
+            e.Name = { value = "monster" }
+            tiny_addEntity(world, e)
+         end
+         tiny_refresh(world)
+      end,
+      before = create_scaling_world(),
+      after = clear_world,
+   },
+
+   destroy = {
+      fn = function(ctx)
+         local world, entities = ctx.world, ctx.entities
+         for i = 1, #entities do
+            tiny_removeEntity(world, entities[i])
+         end
+         tiny_refresh(world)
+      end,
+      before = create_scaling_world(),
       after = clear_world,
    },
 }
@@ -506,4 +591,5 @@ return {
    component = component,
    tag = tag,
    system = system,
+   structural_scaling = structural_scaling,
 }

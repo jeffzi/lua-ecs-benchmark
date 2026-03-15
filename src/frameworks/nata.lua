@@ -7,6 +7,7 @@ local nata_new = nata.new
 
 local DT = config.DT
 local WORLD_MULTIPLIER = config.WORLD_MULTIPLIER
+local N_SYSTEMS = config.N_SYSTEMS
 
 -- ----------------------------------------------------------------------------
 -- Setup
@@ -545,6 +546,95 @@ local system = {
 }
 
 -- ----------------------------------------------------------------------------
+-- Structural Scaling Tests
+-- ----------------------------------------------------------------------------
+
+--- Factory: returns a `before` that creates a populated pool with N_SYSTEMS background systems.
+--- @param make_entity? fun(): table Factory for tracked entities.
+--- @return fun(_ctx: table, p: { n_entities: number }): { pool: table, entities: table[] }
+local function create_scaling_world(make_entity)
+   make_entity = make_entity or make_default_entity
+   return function(_ctx, p)
+      local systems = {}
+      for _ = 1, N_SYSTEMS do
+         local sys = {}
+         function sys:update(_dt) end
+         systems[#systems + 1] = sys
+      end
+
+      local pool = nata_new({
+         groups = { pos_vel = { filter = { "Position", "Velocity" } } },
+         systems = systems,
+      })
+
+      -- Background entities
+      for _ = 1, p.n_entities * (WORLD_MULTIPLIER - 1) do
+         pool:queue({
+            Health = { current = 100, max = 100 },
+            Name = { value = "monster" },
+            Aggro = true,
+         })
+      end
+
+      -- Tracked entities for test operations
+      local entities = {}
+      for i = 1, p.n_entities do
+         entities[i] = pool:queue(make_entity())
+      end
+
+      pool:flush()
+      shuffle(entities)
+      return { pool = pool, entities = entities }
+   end
+end
+
+--- @type BenchmarkTests
+local structural_scaling = {
+   create = {
+      fn = function(ctx, p)
+         local pool = ctx.pool
+         for _ = 1, p.n_entities do
+            pool:queue({
+               Position = { x = 0, y = 0 },
+               Alive = true,
+            })
+         end
+         pool:flush()
+      end,
+      before = create_scaling_world(),
+      after = clear_pool,
+   },
+
+   add_component = {
+      fn = function(ctx, _p)
+         local pool, entities = ctx.pool, ctx.entities
+         for i = 1, #entities do
+            entities[i].Name = { value = "monster" }
+            pool:queue(entities[i])
+         end
+         pool:flush()
+      end,
+      before = create_scaling_world(),
+      after = clear_pool,
+   },
+
+   destroy = {
+      fn = function(ctx, _p)
+         local pool, entities = ctx.pool, ctx.entities
+         local entity_set = {}
+         for i = 1, #entities do
+            entity_set[entities[i]] = true
+         end
+         pool:remove(function(e)
+            return entity_set[e]
+         end)
+      end,
+      before = create_scaling_world(),
+      after = clear_pool,
+   },
+}
+
+-- ----------------------------------------------------------------------------
 -- Module Export
 -- ----------------------------------------------------------------------------
 
@@ -554,4 +644,5 @@ return {
    component = component,
    tag = tag,
    system = system,
+   structural_scaling = structural_scaling,
 }

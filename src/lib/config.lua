@@ -11,6 +11,9 @@ config.DT = 1 / 60
 --- Number of unique buff components for fragmented iteration tests.
 config.N_BUFFS = 20
 
+--- Number of background systems for structural scaling tests.
+config.N_SYSTEMS = 20
+
 --- Default entity counts for benchmarks.
 config.ENTITY_COUNTS = { 100, 1000, 10000 }
 

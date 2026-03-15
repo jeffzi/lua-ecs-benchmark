@@ -12,6 +12,7 @@ local lt_System = lovetoys.System
 
 local DT = config.DT
 local WORLD_MULTIPLIER = config.WORLD_MULTIPLIER
+local N_SYSTEMS = config.N_SYSTEMS
 
 -- ----------------------------------------------------------------------------
 -- Setup
@@ -603,6 +604,100 @@ local empty_systems = {
 }
 
 -- ----------------------------------------------------------------------------
+-- Structural Scaling Tests
+-- ----------------------------------------------------------------------------
+
+--- Factory: returns a `before` that creates a populated engine with N_SYSTEMS background systems.
+--- @param make_entity? fun(engine: table): table Factory for tracked entities.
+--- @return fun(_ctx: table, p: { n_entities: number }): { engine: table, entities: table[] }
+local function create_scaling_world(make_entity)
+   make_entity = make_entity or make_default_entity
+   return function(_ctx, p)
+      local engine = lt_Engine()
+
+      for i = 1, N_SYSTEMS do
+         local Sys = lt_class("BgSys" .. i, lt_System)
+         function Sys:requires()
+            return { "Position", "Velocity" }
+         end
+         function Sys:update(_dt) end
+         engine:addSystem(Sys())
+      end
+
+      -- Background entities
+      for _ = 1, p.n_entities * (WORLD_MULTIPLIER - 1) do
+         local e = lt_Entity()
+         e:initialize()
+         e:add(Health(100, 100))
+         e:add(Name("monster"))
+         e:add(Aggro())
+         engine:addEntity(e)
+      end
+
+      -- Tracked entities for test operations
+      local entities = {}
+      for i = 1, p.n_entities do
+         entities[i] = make_entity(engine)
+      end
+
+      shuffle(entities)
+      return { engine = engine, entities = entities }
+   end
+end
+
+--- @type luamark.Spec
+local scaling_create = {
+   fn = function(ctx, p)
+      local engine = ctx.engine
+      for _ = 1, p.n_entities do
+         local e = lt_Entity()
+         e:initialize()
+         e:add(Position(0, 0))
+         e:add(Alive())
+         engine:addEntity(e)
+      end
+   end,
+   before = create_scaling_world(),
+   after = clear_engine,
+}
+
+--- @type luamark.Spec
+local scaling_destroy = {
+   fn = function(ctx, _p)
+      local engine, entities = ctx.engine, ctx.entities
+      for i = 1, #entities do
+         engine:removeEntity(entities[i])
+      end
+   end,
+   before = create_scaling_world(),
+   after = clear_engine,
+}
+
+--- @type luamark.Spec
+local nobatch_scaling_add_component = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i]:add(Name("monster"))
+      end
+   end,
+   before = create_scaling_world(),
+   after = clear_engine,
+}
+
+--- @type luamark.Spec
+local batch_scaling_add_component = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i]:addMultiple({ Name("monster") })
+      end
+   end,
+   before = create_scaling_world(),
+   after = clear_engine,
+}
+
+-- ----------------------------------------------------------------------------
 -- Module Export
 -- ----------------------------------------------------------------------------
 
@@ -632,6 +727,10 @@ return {
             multi_20 = multi_20,
             empty_systems = empty_systems,
          },
+         structural_scaling = {
+            create = scaling_create,
+            destroy = scaling_destroy,
+         },
       },
       ["lovetoys-nobatch"] = {
          component = {
@@ -640,6 +739,9 @@ return {
          tag = {
             add = nobatch_tag_add,
          },
+         structural_scaling = {
+            add_component = nobatch_scaling_add_component,
+         },
       },
       ["lovetoys-batch"] = {
          component = {
@@ -647,6 +749,9 @@ return {
          },
          tag = {
             add = batch_tag_add,
+         },
+         structural_scaling = {
+            add_component = batch_scaling_add_component,
          },
       },
    },

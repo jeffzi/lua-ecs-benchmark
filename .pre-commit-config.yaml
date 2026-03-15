@@ -24,7 +24,7 @@ repos:
 
   # Lua formatting
   - repo: https://github.com/JohnnyMorganz/StyLua
-    rev: v2.3.1
+    rev: v2.4.0
     hooks:
       - id: stylua-github
 
@@ -43,7 +43,7 @@ repos:
 
   # Python linting & formatting
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.1
+    rev: v0.15.6
     hooks:
       - id: ruff-check
         args: [--fix]
@@ -51,7 +51,7 @@ repos:
 
   # Python type checking
   - repo: https://github.com/DetachHead/basedpyright-prek-mirror
-    rev: 1.38.1
+    rev: 1.38.2
     hooks:
       - id: basedpyright
 

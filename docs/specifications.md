@@ -1,7 +1,7 @@
 # Benchmark Specifications
 
-Framework-agnostic reference for all benchmark tests.
-Each framework implementation must match this specification exactly.
+Framework-agnostic reference for all benchmarks.
+Every framework must match this specification exactly.
 
 ---
 
@@ -9,19 +9,18 @@ Each framework implementation must match this specification exactly.
 
 ### Entity Counts
 
-Each benchmark is run at four entity scales:
+Each benchmark runs at four entity scales:
 
 ```lua
 ENTITY_COUNTS = {100, 1000, 10000, 50000}
 ```
 
-The variable `n_entities` (or `N`) denotes the entity count at a given scale.
+`n_entities` (or `N`) denotes the entity count for a given scale.
 
 ### World Population
 
 Entity, component, and tag tests run against a **pre-populated world** at a 1:5
-ratio. The multiplier (`WORLD_MULTIPLIER = 5`) yields a total world size of
-`5N`:
+ratio. The multiplier (`WORLD_MULTIPLIER = 5`) produces a world of `5N` entities:
 
 - `4N` **background** entities (idle)
 - `N` **tracked** entities (targets of the benchmark operation)
@@ -30,23 +29,24 @@ Three motivations drive this design:
 
 1. **Realistic workload** — games process a subset of the world each frame. A
    20% active ratio approximates small-scale game behavior.
-2. **Allocation pressure** — a pre-populated world exposes how frameworks behave
+2. **Allocation pressure** — a pre-populated world exposes framework behavior
    under memory pressure (GC, hash resizing). An empty world measures only
-   best-case allocation.
+   best-case allocation cost.
 3. **Stable measurements** — a populated world produces more consistent timings
    than an empty one, where early allocations dominate variance.
 
 System tests use a **1:1 ratio** (no background entities) to isolate iteration
-throughput and scheduling overhead from structural operations. Adding background
+throughput and scheduling overhead from structural cost. Adding background
 entities would conflate iteration cost with world-size effects.
 
 ### Constants
 
-| Constant           | Value  | Purpose                                               |
-| ------------------ | ------ | ----------------------------------------------------- |
-| `WORLD_MULTIPLIER` | `5`    | Pre-population ratio for entity/component/tag tests   |
-| `DT`               | `1/60` | Simulated frame delta (60 FPS) for system ticks       |
-| `N_BUFFS`          | `20`   | Number of unique buff components for fragmented tests |
+| Constant           | Value  | Purpose                                                   |
+| ------------------ | ------ | --------------------------------------------------------- |
+| `WORLD_MULTIPLIER` | `5`    | Pre-population ratio for entity/component/tag tests       |
+| `DT`               | `1/60` | Simulated frame delta (60 FPS) for system ticks           |
+| `N_BUFFS`          | `20`   | Number of unique buff components for fragmented tests     |
+| `N_SYSTEMS`        | `20`   | Number of background systems for structural scaling tests |
 
 ---
 
@@ -60,14 +60,14 @@ offers a non-batch API (one entity at a time) and a batch API (bulk operations);
 
 A framework file exports one of two shapes:
 
-- **Non-variant** (`BenchmarkModule`): exports grouped tests directly.
+- **Non-variant** (`BenchmarkModule`): exports test groups directly.
 
   ```lua
   return { entity = {...}, component = {...}, tag = {...}, system = {...} }
   ```
 
-- **Variant** (`VariantModule`): exports named variants, each containing grouped
-  tests.
+- **Variant** (`VariantModule`): exports named variants, each containing test
+  groups.
 
   ```lua
   return {
@@ -82,7 +82,7 @@ A framework file exports one of two shapes:
 
 - **Shared tests** go in the default variant (e.g., `"ecs-lua"`, `"lovetoys"`).
   These tests share identical implementations across all API styles.
-- **Specific variants** (e.g., `"ecs-lua-batch"`, `"ecs-lua-nobatch"`) contain
+- **Specific variants** (e.g., `"ecs-lua-batch"`, `"ecs-lua-nobatch"`) hold
   **only** tests whose implementations differ between API styles.
 - **Charts** compare variants only on tests both implement, keeping comparisons
   fair.
@@ -94,15 +94,17 @@ A framework file exports one of two shapes:
 1. **Idiomatic code** — use each framework's optimal API. Adapters add
    function-call overhead that skews measurements.
 2. **Full deferred-operation cost** — when a framework defers structural changes
-   to command buffers, include the complete cost (record + playback). The
+   to command buffers, measure the complete cost (record + playback). The
    `world:flush()` calls in pseudocode represent this.
 3. **Inactive systems during structural tests** — entity/component/tag
    benchmarks must keep all systems inactive to isolate structural cost from
-   iteration overhead.
+   iteration overhead. The `structural_scaling` group is the deliberate
+   exception: it registers background systems to measure their impact on
+   structural operations.
 4. **Shuffle to defeat insertion-order bias** — shuffle entity arrays
    (Fisher-Yates) after creation so benchmarks gain no advantage from sequential
    memory layout. Without shuffling, frameworks that store entities contiguously
-   would exhibit artificially good cache locality, absent in real-world random
+   would show artificially good cache locality, absent in real-world random
    access.
 
 ---
@@ -111,7 +113,7 @@ A framework file exports one of two shapes:
 
 ### Component Types
 
-Entity tests exercise both component types:
+Entity tests exercise two component types:
 
 | Type                | Description          | Examples                                                                                                        |
 | ------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -122,24 +124,24 @@ Entity tests exercise both component types:
 
 Tests run against a pre-populated world to simulate realistic allocation pressure.
 
-**Multiplier:** 5 (constant for all tests). Total world size = `5N`:
+**Multiplier:** 5 (constant for all tests). World size = `5N`:
 
 - `4N` **background** entities (idle)
 - `N` **tracked** entities (targets of the benchmark operation)
 
-Background entities use **different components** from tracked entities to prevent
+Background entities use **different components** from tracked entities to avoid
 query overlap. Background composition:
 
 ```text
 Health = {current=100, max=100}, Name = {value="monster"}, Aggro = true
 ```
 
-Tracked entities are **shuffled** (Fisher-Yates) after creation, eliminating
+Tracked entities are **shuffled** (Fisher-Yates) after creation to eliminate
 insertion-order bias.
 
 ### Default Entity
 
-Most tests pre-populate tracked entities with this composition:
+Most tests pre-populate tracked entities with this default composition:
 
 ```text
 Position = {x=0.0, y=0.0}   -- table component
@@ -147,8 +149,8 @@ Velocity = {x=0.0, y=0.0}   -- table component
 Alive    = true              -- tag component
 ```
 
-2 table components + 1 tag. Velocity exists so the `remove` test can delete a
-table component while the entity retains `Position`, exercising partial removal.
+2 table components + 1 tag. Velocity exists so `remove` can delete a table
+component while the entity retains `Position`, exercising partial removal.
 
 ---
 
@@ -156,7 +158,7 @@ table component while the entity retains `Position`, exercising partial removal.
 
 #### create_empty
 
-**Purpose:** Measure bare entity allocation cost without components.
+**Purpose:** Measure bare entity allocation cost, without components.
 
 | Property | Value                                                    |
 | -------- | -------------------------------------------------------- |
@@ -171,14 +173,13 @@ for i = 1..N:
 world:flush()
 ```
 
-**Rationale:** Isolates entity allocation cost from component assignment.
+**Rationale:** Isolates allocation cost from component assignment.
 
 ---
 
 #### create_with_components
 
-**Purpose:** Measure entity creation cost with components attached at creation
-time.
+**Purpose:** Measure entity creation cost when components are attached at birth.
 
 | Property   | Value                                                      |
 | ---------- | ---------------------------------------------------------- |
@@ -220,9 +221,8 @@ for i = 1..N:
 world:flush()
 ```
 
-**Rationale:** Entities leave a world that remains populated, the realistic
-case. Games typically discard entire worlds rather than destroy entities
-individually.
+**Rationale:** Entities leave a world that remains populated -- the realistic
+case. Games discard entire worlds rather than destroy entities individually.
 
 ---
 
@@ -254,8 +254,7 @@ for i = 1..N:
 ```
 
 **Rationale:** Reading both fields of a two-field component measures the
-amortized cost of the component lookup. Real code rarely accesses a single
-field in isolation.
+amortized lookup cost. Real code rarely reads a single field in isolation.
 
 ---
 
@@ -280,7 +279,7 @@ for i = 1..N:
 ```
 
 **Rationale:** Mirrors `get` for writes. Writing both fields amortizes the
-component lookup, matching the typical access pattern.
+lookup, matching the typical access pattern.
 
 ---
 
@@ -331,8 +330,8 @@ world:flush()
 ```
 
 **Rationale:** Removes a component present on the default entity, triggering an
-archetype transition. After removal, entities retain `Position` and `Alive`,
-verifying correct handling of partial component sets.
+archetype transition. After removal, entities keep `Position` and `Alive`,
+verifying correct partial-removal handling.
 
 ---
 
@@ -345,16 +344,16 @@ Tag tests exercise each framework's **idiomatic tag mechanism**:
 - Frameworks with empty components (concord, ecs-lua, lovetoys) use empty
   component instances
 
-Tags carry no data, so `get` and `set` do not apply. Components omit `has`
-because callers call `get` and check the return value directly.
+Tags carry no data, so `get` and `set` do not apply. Component tests omit `has`
+because callers retrieve via `get` and check the return value.
 
-Each test performs exactly **one operation per entity**.
+Each test performs **one operation per entity**.
 
 ### Tag Tests
 
 #### has
 
-**Purpose:** Measure tag presence check cost.
+**Purpose:** Measure tag presence-check cost.
 
 | Property       | Value                                                          |
 | -------------- | -------------------------------------------------------------- |
@@ -370,8 +369,8 @@ for i = 1..N:
     _ = has(e, Alive)    -- check tag presence (boolean result)
 ```
 
-**Rationale:** Tests tag lookup cost using each framework's idiomatic check.
-Returns a boolean (present/absent), unlike component `get` that returns data.
+**Rationale:** Measures tag lookup cost via each framework's idiomatic check.
+Returns a boolean (present/absent), unlike component `get`, which returns data.
 
 ---
 
@@ -395,7 +394,7 @@ for i = 1..N:
 world:flush()
 ```
 
-**Rationale:** Adds a tag absent from the default entity, testing structural
+**Rationale:** Adds a tag absent from the default entity, measuring structural
 change cost for lightweight markers.
 
 ---
@@ -421,7 +420,7 @@ world:flush()
 ```
 
 **Rationale:** Removes a tag present on the default entity, measuring the
-structural change cost of lightweight marker removal.
+structural cost of lightweight marker removal.
 
 ---
 
@@ -429,7 +428,7 @@ structural change cost of lightweight marker removal.
 
 ### Common Patterns
 
-All system tests share the same lifecycle:
+All system tests share this lifecycle:
 
 1. **Create entities** with test-specific compositions
 2. **Register systems** with appropriate filters
@@ -438,12 +437,11 @@ All system tests share the same lifecycle:
 5. **Measure** by calling `world:update(dt)` repeatedly
 
 The warmup tick initializes framework internals (entity lists, system caches,
-query indices) before measurement begins. Without it, the first iteration would
-include one-time setup costs.
+query indices) before measurement. Without it, the first iteration would include
+one-time setup cost.
 
-System tests omit background entities, the world population multiplier, and
-shuffling. Entities use test-specific compositions rather than the default
-entity.
+System tests omit background entities, the world multiplier, and shuffling.
+Entities use test-specific compositions instead of the default.
 
 **Constants:** `dt = 1/60` (60 FPS frame time), `N_BUFFS = 20`.
 
@@ -463,8 +461,8 @@ entity.
 
 #### throughput
 
-**Purpose:** Measure raw per-entity processing throughput with one system, 100%
-match rate, and minimal workload.
+**Purpose:** Measure raw per-entity throughput with one system, 100% match rate,
+and minimal workload.
 
 | Property           | Value                                            |
 | ------------------ | ------------------------------------------------ |
@@ -484,8 +482,8 @@ MovementSystem — filter: Position, Velocity
 ```
 
 **Rationale:** Establishes the baseline for system iteration cost. One system,
-one archetype, every entity matched -- any overhead beyond the arithmetic is
-framework dispatch cost.
+one archetype, every entity matched -- overhead beyond the arithmetic is pure
+dispatch cost.
 
 ---
 
@@ -528,8 +526,8 @@ SwapCE — filter: C, E          (matches i%4 == 3 only)
         e.C.v, e.E.v = e.E.v, e.C.v
 ```
 
-**Rationale:** The varying match rates (100% vs 25%) reveal whether the
-framework skips non-matching entities or archetypes efficiently.
+**Rationale:** The contrasting match rates (100% vs 25%) reveal whether a
+framework efficiently skips non-matching entities or archetypes.
 
 ---
 
@@ -576,17 +574,17 @@ Buff1System — filter: Buff1           (matches 1 of 20 archetypes)
 **Rationale:** Archetype-based ECS frameworks must iterate all matching
 archetypes to find entities. With 20 archetypes, the 100%-match system visits
 all 20; the 5%-match system visits just 1. This contrast exposes per-archetype
-overhead in the framework's query and iteration machinery. Buff1System reads its
-own component (Buff1, not Position), aligning each system's filter with its data
-access. Systems read-accumulate rather than write, separating iteration cost from
-component write overhead (measured separately by component `set`).
+query and iteration overhead. Buff1System reads its own component (Buff1, not
+Position), aligning each system's filter with its data access. Systems
+read-accumulate rather than write, separating iteration cost from write
+overhead (measured separately by component `set`).
 
 ---
 
 #### chained
 
-**Purpose:** Measure pipeline overhead and correctness when each system's output
-feeds the next system's input.
+**Purpose:** Measure pipeline overhead when each system's output feeds the next
+system's input.
 
 | Property           | Value                                                           |
 | ------------------ | --------------------------------------------------------------- |
@@ -607,16 +605,16 @@ SysDE — filter: D, E     →  e.E.v = e.D.v
 
 After one tick, the value `1` propagates: `A → B → C → D → E`.
 
-**Rationale:** Verifies that frameworks execute systems in registration order and
-that writes propagate to subsequent systems within the same tick. The value chain
-`A -> B -> C -> D -> E` confirms deterministic ordering.
+**Rationale:** Confirms that frameworks execute systems in registration order
+and propagate writes within the same tick. The value chain
+`A -> B -> C -> D -> E` proves deterministic ordering.
 
 ---
 
 #### multi_20
 
-**Purpose:** Measure system scheduling overhead with 20 systems, all operating
-on the same entities.
+**Purpose:** Measure system scheduling overhead with 20 systems all operating on
+the same entities.
 
 | Property           | Value                                                               |
 | ------------------ | ------------------------------------------------------------------- |
@@ -643,18 +641,17 @@ for comp_name in [Comp1..Comp10]:
             sum = sum + e[comp_name].value
 ```
 
-**Rationale:** Twenty systems all matching every entity isolate per-system
-dispatch overhead. Frameworks that batch or inline system calls outperform those
-with high per-invocation cost. Systems read-accumulate rather than write,
-separating dispatch cost from component write overhead (measured separately by
-component `set`).
+**Rationale:** Twenty systems matching every entity isolate per-system dispatch
+overhead. Frameworks that batch or inline system calls outperform those with high
+per-invocation cost. Systems read-accumulate rather than write, separating
+dispatch cost from write overhead (measured separately by component `set`).
 
 ---
 
 #### empty_systems
 
 **Purpose:** Measure system dispatch overhead when no entities match -- the cost
-of checking and skipping 20 idle systems per tick.
+of checking and skipping 20 idle systems each tick.
 
 | Property           | Value                            |
 | ------------------ | -------------------------------- |
@@ -673,7 +670,118 @@ for i = 1..20:
             e.NonExistent.value += dt    -- never executes
 ```
 
-**Rationale:** Tests whether a framework short-circuits when a system matches no
-entities. Archetype-based frameworks skip at the query level; filtering-based
-frameworks may still iterate every entity. The difference reveals each
-framework's overhead for empty result sets at scale.
+**Rationale:** Reveals whether a framework short-circuits when no entities
+match. Archetype-based frameworks skip at the query level; filter-based
+frameworks may still iterate every entity. The gap exposes each framework's
+cost for empty result sets.
+
+---
+
+## Part 5 — Structural Scaling Tests
+
+### Motivation
+
+The entity, component, and tag tests (Parts 1-3) deliberately keep all systems
+inactive (guideline #3) to isolate raw structural cost. In a real game, dozens
+of systems are registered while entities are created, modified, and destroyed.
+Structural operations may trigger system re-matching, entity-list updates, or
+archetype transitions whose cost scales with registered system count.
+
+The `structural_scaling` group re-runs three representative structural operations
+with 20 registered background systems. Comparing these results against the
+zero-system baselines in Parts 1-3 reveals each framework's structural scaling
+behavior.
+
+### Background System Setup
+
+All structural scaling tests share this world setup:
+
+1. Create world
+2. Register `N_SYSTEMS` (20) no-op systems, each querying `Position` +
+   `Velocity`
+3. Populate `4N` background entities + `N` tracked entities (same as Parts 1–3)
+4. Flush/refresh
+5. Shuffle tracked entities
+
+The systems have empty bodies — they exist only to incur filter-matching cost
+during structural operations, not iteration cost. All 20 query the same
+components (`Position`, `Velocity`) to maximize matching work across
+framework architectures.
+
+---
+
+### Structural Scaling Tests
+
+#### create
+
+**Purpose:** Measure entity creation cost with registered background systems.
+
+| Property           | Value                                                      |
+| ------------------ | ---------------------------------------------------------- |
+| Setup              | Scaling world (20 systems + 4N background + N tracked)     |
+| Components created | 1 table (`Position = {x=0, y=0}`) + 1 tag (`Alive = true`) |
+| Teardown           | Clear all entities                                         |
+
+**Operation:**
+
+```text
+for i = 1..N:
+    world:add_entity({
+        Position = {x=0, y=0},
+        Alive = true
+    })
+world:flush()
+```
+
+**Rationale:** Mirrors `create_with_components` from Part 1 but with active
+systems. The gap between this result and `entity/create_with_components` reveals
+how structural operations degrade as system count grows.
+
+---
+
+#### add_component
+
+**Purpose:** Measure component addition cost with registered background systems.
+
+| Property        | Value                                                  |
+| --------------- | ------------------------------------------------------ |
+| Setup           | Scaling world (20 systems + 4N background + N tracked) |
+| Component added | 1 table (`Name = {value="monster"}`)                   |
+| Teardown        | Clear all entities                                     |
+
+**Operation:**
+
+```text
+for i = 1..N:
+    e = entities[i]
+    e.Name = {value="monster"}
+    world:entity_updated(e)
+world:flush()
+```
+
+**Rationale:** Mirrors `component/add` from Part 2 but with active systems.
+Component addition triggers archetype transitions and system re-matching,
+exposing per-system overhead during structural changes.
+
+---
+
+#### destroy
+
+**Purpose:** Measure entity destruction cost with registered background systems.
+
+| Property | Value                                                  |
+| -------- | ------------------------------------------------------ |
+| Setup    | Scaling world (20 systems + 4N background + N tracked) |
+| Teardown | Clear all entities                                     |
+
+**Operation:**
+
+```text
+for i = 1..N:
+    world:remove_entity(entities[i])
+world:flush()
+```
+
+**Rationale:** Mirrors `entity/destroy` from Part 1 but with active systems.
+Entity removal must update system entity lists or archetype membership, exposing
+per-system destruction overhead.

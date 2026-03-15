@@ -47,6 +47,7 @@ TEST_ORDER: dict[str, list[str]] = {
     "component": ["get", "set", "add", "remove"],
     "tag": ["has", "add", "remove"],
     "system": ["throughput", "overlap", "fragmented", "chained", "multi_20", "empty_systems"],
+    "structural_scaling": ["create", "add_component", "destroy"],
 }
 
 MAX_RELATIVE_PERFORMANCE = 20.0

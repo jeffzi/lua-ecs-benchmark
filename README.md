@@ -81,7 +81,7 @@ Interpreting the results: [results/README.md](results/README.md)
 <!-- AUTO-GENERATED-CONTENT:START (BENCHMARK_ENVIRONMENT) -->
 
 ```text
-OS: macOS 26.3
+OS: macOS 26.3.1
 CPU: Apple M2 Max
 Cores: 12 cores (12 threads)
 Max Frequency: 3.50 GHz

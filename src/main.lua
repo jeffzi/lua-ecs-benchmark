@@ -18,6 +18,7 @@ local GROUPS = {
       name = "system",
       tests = { "throughput", "overlap", "fragmented", "chained", "multi_20", "empty_systems" },
    },
+   { name = "structural_scaling", tests = { "create", "add_component", "destroy" } },
 }
 
 local HEADERS = {

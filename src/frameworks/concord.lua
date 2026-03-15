@@ -13,6 +13,7 @@ local concord_world = Concord.world
 
 local DT = config.DT
 local WORLD_MULTIPLIER = config.WORLD_MULTIPLIER
+local N_SYSTEMS = config.N_SYSTEMS
 local ORIGINAL_SERIALIZE = concord_entity.SERIALIZE_BY_DEFAULT
 
 -- ----------------------------------------------------------------------------
@@ -563,6 +564,82 @@ local system = {
 }
 
 -- ----------------------------------------------------------------------------
+-- Structural Scaling Tests
+-- ----------------------------------------------------------------------------
+
+--- Factory: returns a `before` that creates a populated world with N_SYSTEMS background systems.
+--- @param make_entity? fun(world: table): table Factory for tracked entities.
+--- @return fun(_ctx: table, p: { n_entities: number }): { world: table, entities: table[] }
+local function create_scaling_world(make_entity)
+   make_entity = make_entity or make_default_entity
+   return function(_ctx, p)
+      local world = concord_world()
+
+      local systems = {}
+      for _ = 1, N_SYSTEMS do
+         local sys = concord_system({ pool = { "Position", "Velocity" } })
+         function sys:update(_dt) end
+         systems[#systems + 1] = sys
+      end
+      world:addSystems(unpack(systems))
+
+      -- Background entities
+      for _ = 1, p.n_entities * (WORLD_MULTIPLIER - 1) do
+         concord_entity(world):give("Health", 100, 100):give("Name", "monster"):give("Aggro")
+      end
+
+      -- Tracked entities for test operations
+      local entities = {}
+      for i = 1, p.n_entities do
+         entities[i] = make_entity(world)
+      end
+
+      shuffle(entities)
+      world:__flush()
+      return { world = world, entities = entities }
+   end
+end
+
+--- @type BenchmarkTests
+local structural_scaling = {
+   create = {
+      fn = function(ctx, p)
+         local world = ctx.world
+         for _ = 1, p.n_entities do
+            concord_entity(world):give("Position", 0.0, 0.0):give("Alive")
+         end
+         world:__flush()
+      end,
+      before = create_scaling_world(),
+      after = clear_world,
+   },
+
+   add_component = {
+      fn = function(ctx, _p)
+         local world, entities = ctx.world, ctx.entities
+         for i = 1, #entities do
+            entities[i]:give("Name", "monster")
+         end
+         world:__flush()
+      end,
+      before = create_scaling_world(),
+      after = clear_world,
+   },
+
+   destroy = {
+      fn = function(ctx, _p)
+         local world, entities = ctx.world, ctx.entities
+         for i = 1, #entities do
+            world:removeEntity(entities[i])
+         end
+         world:__flush()
+      end,
+      before = create_scaling_world(),
+      after = clear_world,
+   },
+}
+
+-- ----------------------------------------------------------------------------
 -- No-Serialize Variant
 -- ----------------------------------------------------------------------------
 
@@ -606,6 +683,7 @@ return {
          component = component,
          tag = tag,
          system = system,
+         structural_scaling = structural_scaling,
       },
       ["concord-no-serialize"] = {
          entity = wrap_tests_no_serialize(entity),

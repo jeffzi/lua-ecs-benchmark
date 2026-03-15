@@ -23,6 +23,7 @@ local ecs_World = ECS.World
 
 local DT = config.DT
 local WORLD_MULTIPLIER = config.WORLD_MULTIPLIER
+local N_SYSTEMS = config.N_SYSTEMS
 
 -- ----------------------------------------------------------------------------
 -- Setup
@@ -554,6 +555,111 @@ local empty_systems = {
 }
 
 -- ----------------------------------------------------------------------------
+-- Structural Scaling Tests
+-- ----------------------------------------------------------------------------
+
+--- Factory: returns a `before` that creates a populated world with N_SYSTEMS background systems.
+--- @param make_entity? fun(world: table): table Factory for tracked entities.
+--- @return fun(_ctx: table, p: { n_entities: number }): table
+local function create_scaling_world(make_entity)
+   make_entity = make_entity or make_default_entity
+   return function(_ctx, p)
+      local world = ecs_World(nil, 60, false)
+
+      for i = 1, N_SYSTEMS do
+         local sys = ecs_System("process", i, ecs_Query.All(Position, Velocity), function() end)
+         world:AddSystem(sys)
+      end
+
+      -- Background entities
+      for _ = 1, p.n_entities * (WORLD_MULTIPLIER - 1) do
+         world:Entity(Health({ current = 100, max = 100 }), Name({ value = "monster" }), Aggro())
+      end
+
+      -- Tracked entities for test operations
+      local entities = {}
+      for i = 1, p.n_entities do
+         entities[i] = make_entity(world)
+      end
+
+      world:Update("process", DT)
+      shuffle(entities)
+      return { world = world, entities = entities, timestep = 1, dt = DT }
+   end
+end
+
+--- @type luamark.Spec
+local scaling_destroy = {
+   fn = function(ctx, _p)
+      local world, entities = ctx.world, ctx.entities
+      local timestep = ctx.timestep + 1
+      for i = 1, #entities do
+         world:Remove(entities[i])
+      end
+      world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = create_scaling_world(),
+   after = destroy_world,
+}
+
+--- @type luamark.Spec
+local nobatch_scaling_create = {
+   fn = function(ctx, p)
+      local world = ctx.world
+      local timestep = ctx.timestep + 1
+      for _ = 1, p.n_entities do
+         local e = world:Entity()
+         e[Position] = Position({ x = 0, y = 0 })
+         e[Alive] = Alive()
+      end
+      world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = create_scaling_world(),
+   after = destroy_world,
+}
+
+--- @type luamark.Spec
+local batch_scaling_create = {
+   fn = function(ctx, p)
+      local world = ctx.world
+      local timestep = ctx.timestep + 1
+      for _ = 1, p.n_entities do
+         world:Entity(Position({ x = 0, y = 0 }), Alive())
+      end
+      world:Update("process", timestep * ctx.dt)
+      ctx.timestep = timestep
+   end,
+   before = create_scaling_world(),
+   after = destroy_world,
+}
+
+--- @type luamark.Spec
+local nobatch_scaling_add_component = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i][Name] = Name({ value = "monster" })
+      end
+   end,
+   before = create_scaling_world(),
+   after = destroy_world,
+}
+
+--- @type luamark.Spec
+local batch_scaling_add_component = {
+   fn = function(ctx, _p)
+      local entities = ctx.entities
+      for i = 1, #entities do
+         entities[i]:Set(Name({ value = "monster" }))
+      end
+   end,
+   before = create_scaling_world(),
+   after = destroy_world,
+}
+
+-- ----------------------------------------------------------------------------
 -- Module Export
 -- ----------------------------------------------------------------------------
 
@@ -582,6 +688,9 @@ return {
             multi_20 = multi_20,
             empty_systems = empty_systems,
          },
+         structural_scaling = {
+            destroy = scaling_destroy,
+         },
       },
       ["ecs-lua-nobatch"] = {
          entity = {
@@ -593,6 +702,10 @@ return {
          tag = {
             add = nobatch_tag_add,
          },
+         structural_scaling = {
+            create = nobatch_scaling_create,
+            add_component = nobatch_scaling_add_component,
+         },
       },
       ["ecs-lua-batch"] = {
          entity = {
@@ -603,6 +716,10 @@ return {
          },
          tag = {
             add = batch_tag_add,
+         },
+         structural_scaling = {
+            create = batch_scaling_create,
+            add_component = batch_scaling_add_component,
          },
       },
    },
